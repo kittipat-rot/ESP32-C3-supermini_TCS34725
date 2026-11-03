@@ -1,0 +1,1825 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RGB Colorimeter</title>
+<meta name="description" content="Web app for ESP32-S3 Super Mini + TCS34725 RGB colour sensor over Web Bluetooth or Web Serial">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Thai:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0a0d0f; --grid:rgba(255,255,255,.022);
+  --panel:#11161a; --panel-2:#161c21; --inset:#0b0f12;
+  --line:#222b31; --line-2:#2e3940;
+  --text:#d6dee3; --text-dim:#8494a0; --text-faint:#56646d;
+  --accent:#f2a93b; --accent-ink:#1d1306;
+  --ok:#3fd68a; --warn:#f2a93b; --bad:#ff5b5b;
+  --ch-r:#ff5f5f; --ch-g:#45d483; --ch-b:#58a6ff; --ch-c:#c4ccd2;
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --sans:'IBM Plex Sans','IBM Plex Sans Thai',system-ui,-apple-system,'Segoe UI','Noto Sans Thai',sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:14px/1.5 var(--sans);
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);
+  background-size:24px 24px}
+button,input,select{font:inherit;color:inherit}
+kbd{font:500 10px var(--mono);padding:0 4px;border:1px solid var(--line-2);border-radius:2px;color:var(--text-dim);margin-left:6px}
+[hidden]{display:none!important}
+
+/* ---------- top bar ---------- */
+.topbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px 20px;padding:10px 16px;background:linear-gradient(180deg,#141a1f,#0f1418);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:12px;margin-right:auto;min-width:0}
+.mark{width:34px;height:34px;flex:none}
+.brand-name{font:600 15px/1.25 var(--mono);letter-spacing:.06em}
+.brand-name span{color:var(--text-dim);font-weight:400;letter-spacing:.02em}
+.brand-sub{font:10.5px/1.4 var(--mono);color:var(--text-faint);letter-spacing:.08em;text-transform:uppercase}
+.conn{display:flex;gap:6px;flex-wrap:wrap}
+.lamps{display:flex;gap:14px;flex-wrap:wrap}
+.lamp{display:flex;align-items:center;gap:6px;font:500 10px var(--mono);letter-spacing:.12em;color:var(--text-faint)}
+.lamp i{width:9px;height:9px;border-radius:50%;background:#262d32;box-shadow:inset 0 1px 1px rgba(0,0,0,.7)}
+.lamp.on{color:var(--text)} .lamp.on i{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.lamp.warn{color:var(--text)} .lamp.warn i{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.lamp.bad{color:var(--text)} .lamp.bad i{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+
+.statusbar{display:flex;flex-wrap:wrap;gap:4px 22px;padding:6px 16px;font:11px/1.6 var(--mono);color:var(--text-dim);border-bottom:1px solid var(--line);background:#0c1013}
+.statusbar b{color:var(--text-faint);font-weight:500;margin-right:6px;letter-spacing:.1em}
+.statusbar em{font-style:normal;color:var(--text)}
+.statusbar em.warn{color:var(--warn)}
+
+/* ---------- buttons & inputs ---------- */
+.btn{font:500 11.5px/1 var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--text);background:var(--panel-2);border:1px solid var(--line-2);border-radius:3px;padding:8px 12px;cursor:pointer;transition:border-color .15s,color .15s,background .15s;white-space:nowrap}
+.btn:hover:not(:disabled){border-color:var(--accent);color:#fff}
+.btn:disabled{opacity:.38;cursor:not-allowed}
+.btn.ghost{background:transparent}
+.btn.sm{padding:5px 8px;font-size:10.5px}
+.btn.active{border-color:var(--accent);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover:not(:disabled){color:var(--accent-ink);filter:brightness(1.08)}
+.btn.rec.active{border-color:var(--bad);color:var(--bad);box-shadow:inset 0 0 0 1px var(--bad)}
+.btn.danger:hover:not(:disabled){border-color:var(--bad);color:var(--bad)}
+.btn.busy{color:var(--accent);border-color:var(--accent)}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap}
+.btnrow .btn{flex:1}
+.inp,select.inp{background:var(--inset);border:1px solid var(--line-2);border-radius:3px;padding:6px 8px;font:12px/1.3 var(--mono);color:var(--text);min-width:0}
+.inp:focus,select.inp:focus{outline:none;border-color:var(--accent)}
+input[type=range]{accent-color:var(--accent);width:100%}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:3px;overflow:hidden;flex:none}
+.seg button{background:transparent;border:0;border-right:1px solid var(--line-2);color:var(--text-dim);font:500 11.5px/1 var(--mono);padding:7px 10px;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button:hover:not(:disabled){color:var(--text)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.seg button:disabled{opacity:.4;cursor:not-allowed}
+.switch{width:46px;height:24px;flex:none;border-radius:12px;border:1px solid var(--line-2);background:var(--inset);position:relative;cursor:pointer;padding:0}
+.switch .knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--text-faint);transition:transform .15s,background .15s}
+.switch[aria-checked=true]{border-color:var(--accent);background:rgba(242,169,59,.14)}
+.switch[aria-checked=true] .knob{transform:translateX(22px);background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.switch.lg{width:64px;height:32px;border-radius:16px}
+.switch.lg .knob{width:26px;height:26px}
+.switch.lg[aria-checked=true] .knob{transform:translateX(32px)}
+.switch:disabled{opacity:.4;cursor:not-allowed}
+
+/* ---------- layout ---------- */
+.layout{display:grid;gap:12px;padding:12px;max-width:1680px;margin:0 auto;
+  grid-template-columns:minmax(280px,330px) minmax(0,1fr) minmax(280px,320px);
+  grid-template-areas:"sample chan ctrl" "tabs tabs tabs"}
+.a-sample{grid-area:sample}.a-chan{grid-area:chan}.a-ctrl{grid-area:ctrl}.a-tabs{grid-area:tabs}
+@media (max-width:1180px){
+  .layout{grid-template-columns:minmax(260px,320px) minmax(0,1fr);grid-template-areas:"sample chan" "ctrl ctrl" "tabs tabs"}
+  .ctrl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+}
+@media (max-width:760px){
+  .layout{grid-template-columns:minmax(0,1fr);grid-template-areas:"sample" "chan" "ctrl" "tabs"}
+  .topbar,.statusbar{padding-left:12px;padding-right:12px}
+}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:4px;min-width:0}
+.ph{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);font:500 11px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-dim)}
+.ph-idx{color:var(--accent)}
+.ph-right{margin-left:auto;color:var(--text-faint);letter-spacing:.06em;text-transform:none;text-align:right}
+.pb{padding:14px}
+.tag{display:inline-block;padding:2px 6px;border-radius:2px;border:1px solid currentColor;font:500 10px/1.2 var(--mono);letter-spacing:.1em}
+.tag.ok{color:var(--ok)} .tag.warn{color:var(--warn)}
+.hint{font-size:12px;line-height:1.55;color:var(--text-faint);margin:8px 0 0}
+.lbl{font:500 10px/1.4 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint)}
+
+/* ---------- sample ---------- */
+.swatch-frame{position:relative;padding:9px}
+.swatch-frame::before{content:"";position:absolute;inset:0;pointer-events:none;--m:var(--text-faint);
+  background:
+    linear-gradient(var(--m),var(--m)) left top/14px 1px no-repeat,linear-gradient(var(--m),var(--m)) left top/1px 14px no-repeat,
+    linear-gradient(var(--m),var(--m)) right top/14px 1px no-repeat,linear-gradient(var(--m),var(--m)) right top/1px 14px no-repeat,
+    linear-gradient(var(--m),var(--m)) left bottom/14px 1px no-repeat,linear-gradient(var(--m),var(--m)) left bottom/1px 14px no-repeat,
+    linear-gradient(var(--m),var(--m)) right bottom/14px 1px no-repeat,linear-gradient(var(--m),var(--m)) right bottom/1px 14px no-repeat}
+.swatch{position:relative;aspect-ratio:4/3;background-color:#191e22;border-radius:2px;transition:background-color .25s linear;box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.sat-flag{position:absolute;left:8px;top:8px;font:600 10px/1.4 var(--mono);letter-spacing:.14em;color:#fff;background:var(--bad);padding:2px 6px;border-radius:2px}
+.ref-chip{position:absolute;right:10px;bottom:10px;width:58px;height:58px;border:2px solid rgba(255,255,255,.85);border-radius:2px;box-shadow:0 2px 10px rgba(0,0,0,.45)}
+.ref-chip span{position:absolute;left:0;top:0;padding:1px 4px;font:600 9px/1.4 var(--mono);letter-spacing:.12em;color:#fff;background:rgba(0,0,0,.55)}
+.hexline{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+.hexline output{font:500 28px/1.1 var(--mono);letter-spacing:.04em}
+.cname{font-size:13px;color:var(--text-dim);margin:4px 0 12px;min-height:20px}
+.cname b{color:var(--text);font-weight:500}
+dl.kv{display:grid;grid-template-columns:auto 1fr;margin:0;border-top:1px solid var(--line)}
+dl.kv dt,dl.kv dd{margin:0;padding:6px 0;border-bottom:1px solid var(--line)}
+dl.kv dt{font:500 10px/1.95 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--text-faint)}
+dl.kv dd{font:13px/1.5 var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.de{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:14px 0 12px;padding:10px 12px;background:var(--inset);border:1px solid var(--line);border-radius:3px}
+.de-val{font:500 26px/1.15 var(--mono);font-variant-numeric:tabular-nums}
+.de-verdict{font-size:12.5px;color:var(--text-dim);text-align:right}
+
+/* ---------- channels ---------- */
+.meter{display:grid;grid-template-columns:22px minmax(0,1fr) 96px;grid-template-rows:auto auto;column-gap:14px;row-gap:5px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.m-name{grid-row:1/3;align-self:center;font:600 18px/1 var(--mono);color:var(--chc)}
+.m-bar{position:relative;align-self:center;height:16px;background:var(--inset);border:1px solid var(--line-2);border-radius:2px;overflow:hidden}
+.m-bar::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 1px),rgba(255,255,255,.07) calc(10% - 1px) 10%)}
+.m-fill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--chc);opacity:.85;transition:width .12s linear}
+.m-sat{position:absolute;top:0;bottom:0;left:90%;width:1px;background:var(--bad);z-index:1}
+.m-raw{align-self:center;font:500 21px/1 var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.m-foot{grid-column:2/4;display:flex;gap:4px 16px;flex-wrap:wrap;font:11px/1.4 var(--mono);color:var(--text-faint)}
+.m-foot b{font-weight:500;color:var(--text-dim)}
+.meter.sat .m-fill{background:var(--bad)}
+.meter.sat .m-raw{color:var(--bad)}
+.a-sample,.a-chan,.a-ctrl{align-self:start}
+.readouts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));overflow:hidden}
+@media (max-width:560px){.readouts{grid-template-columns:repeat(2,minmax(0,1fr))}.ro.big .v{font-size:24px}}
+.ro{padding:10px 14px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);margin:0 -1px -1px 0}
+.ro .v{font:500 22px/1.35 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ro.big .v{font-size:28px;color:var(--accent)}
+.ro .v.sm{font-size:16px;line-height:1.9}
+.ro .v u{text-decoration:none;font-size:12px;color:var(--text-dim);margin-left:5px}
+.sub-ph{border-top:1px solid var(--line)}
+
+/* ---------- controls ---------- */
+.cgroup{padding:12px 14px 14px;border-bottom:1px solid var(--line)}
+.cgroup:last-child{border-bottom:0}
+.cg-title{font:500 10px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+.field{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:9px 0;font-size:13px;color:var(--text-dim)}
+.field > span{display:flex;align-items:center;gap:6px}
+.auto-tag{font:600 9px/1.3 var(--mono);letter-spacing:.12em;color:var(--accent);border:1px solid var(--accent);padding:0 4px;border-radius:2px}
+.led-row{display:flex;align-items:center;gap:14px}
+.led-state{font:600 14px/1.3 var(--mono);letter-spacing:.08em}
+.led-state.on{color:var(--accent)}
+.slider{display:grid;grid-template-columns:auto 1fr 44px;align-items:center;gap:10px;margin-top:12px;font-size:13px;color:var(--text-dim)}
+.slider output{font:12px var(--mono);text-align:right;color:var(--text)}
+.cal-row{display:flex;align-items:center;gap:10px;margin:8px 0}
+.cal-row .btn{width:92px}
+.cal-st{font:11px/1.35 var(--mono);color:var(--text-faint)}
+.cal-st.ok{color:var(--ok)}
+
+/* ---------- tabs ---------- */
+.tabbar{display:flex;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tab{background:transparent;border:0;border-bottom:2px solid transparent;color:var(--text-dim);font:500 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;padding:13px 16px 11px;cursor:pointer;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--text);border-bottom-color:var(--accent)}
+.badge{display:inline-block;min-width:18px;padding:1px 5px;margin-left:6px;border-radius:9px;background:var(--line-2);color:var(--text);font-size:10px;text-align:center}
+.tabpane{display:none;padding:14px}
+.tabpane.active{display:block}
+.toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-bottom:12px}
+.toolbar .grow{flex:1}
+.canvas-wrap{position:relative;height:340px;border:1px solid var(--line);background:#0b0f12;border-radius:2px}
+.canvas-wrap canvas{position:absolute;inset:0;width:100%;height:100%}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line-2);border-radius:3px;font:500 11px/1 var(--mono);cursor:pointer;color:var(--text-dim);user-select:none}
+.chip input{appearance:none;-webkit-appearance:none;width:10px;height:10px;border-radius:2px;border:1px solid var(--chc);margin:0}
+.chip input:checked{background:var(--chc)}
+.cie-grid{display:grid;grid-template-columns:minmax(0,1fr) 270px;gap:16px}
+.cie-grid .canvas-wrap{height:480px}
+.legend{display:grid;gap:10px;align-content:start}
+.legend .item{display:grid;grid-template-columns:18px 1fr;gap:4px 8px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:3px;background:var(--inset)}
+.legend .item svg{width:16px;height:16px}
+.legend .item .val{grid-column:2;font:12.5px var(--mono);font-variant-numeric:tabular-nums}
+@media (max-width:860px){.cie-grid{grid-template-columns:1fr}.cie-grid .canvas-wrap{height:380px}}
+.abs-grid{display:grid;grid-template-columns:minmax(250px,1fr) minmax(270px,1fr) minmax(300px,1.3fr);gap:18px}
+.abs-grid .canvas-wrap{height:100%;min-height:320px}
+@media (max-width:1100px){.abs-grid{grid-template-columns:1fr 1fr}.abs-plot{grid-column:1/-1}.abs-grid .canvas-wrap{height:320px}}
+@media (max-width:700px){.abs-grid{grid-template-columns:1fr}}
+.fit{margin-top:12px;padding:10px 12px;border:1px solid var(--line);border-radius:3px;background:var(--inset);font:12.5px/1.7 var(--mono)}
+.fit .unk{font-size:20px;color:var(--accent)}
+.row-inline{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.row-inline .inp{flex:1;min-width:90px}
+.row-inline label{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-dim)}
+table.data{width:100%;border-collapse:collapse;font:12px/1.4 var(--mono);font-variant-numeric:tabular-nums}
+table.data th{text-align:right;font-weight:500;color:var(--text-faint);font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:7px 8px;border-bottom:1px solid var(--line-2);background:var(--panel);position:sticky;top:0;white-space:nowrap}
+table.data td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.data .l{text-align:left}
+table.data tr.best td{color:var(--accent)}
+table.data .x{background:none;border:0;color:var(--text-faint);cursor:pointer;font:inherit;padding:0 4px}
+table.data .x:hover{color:var(--bad)}
+.table-wrap{max-height:360px;overflow:auto;border:1px solid var(--line);border-radius:2px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+.console{height:320px;overflow:auto;margin:0;padding:8px 10px;background:#080b0d;border:1px solid var(--line);border-radius:2px;font:12px/1.55 var(--mono);color:#9fb0ba;white-space:pre-wrap;word-break:break-all}
+.console .tx{color:var(--accent)} .console .err{color:var(--bad)} .console .sys{color:var(--text-faint)} .console .rx{color:#a8dcc0}
+.con-input{display:flex;gap:8px;margin-top:8px;align-items:center}
+.con-input span{font:600 13px var(--mono);color:var(--accent)}
+.con-input .inp{flex:1}
+.wiring{margin:0 0 22px}
+.wiring img{display:block;width:100%;max-width:1200px;height:auto;margin:0 auto;border:1px solid var(--line);border-radius:3px}
+.wiring figcaption{text-align:center;font-size:12px;color:var(--text-faint);margin-top:6px}
+.guide{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:22px}
+.guide h3{font:500 11px/1.4 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
+.guide ol{padding-left:18px;margin:0;color:var(--text-dim);font-size:13px} .guide li{margin:5px 0}
+.guide code{font:12px var(--mono);color:var(--text);background:var(--inset);border:1px solid var(--line);padding:0 4px;border-radius:2px}
+.guide table.data td,.guide table.data th{text-align:left;white-space:normal}
+
+/* ---------- toasts & footer ---------- */
+.toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:50;max-width:min(380px,calc(100vw - 32px))}
+.toast{background:#1a2126;border:1px solid var(--line-2);border-left:3px solid var(--accent);border-radius:3px;padding:10px 12px;font-size:13px;box-shadow:0 8px 28px rgba(0,0,0,.45);animation:tin .18s ease-out}
+.toast.bad{border-left-color:var(--bad)} .toast.ok{border-left-color:var(--ok)}
+@keyframes tin{from{opacity:0;transform:translateY(6px)}}
+footer{padding:4px 16px 20px;text-align:center;font:11px/1.6 var(--mono);color:var(--text-faint)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<noscript><p style="padding:16px">ต้องเปิด JavaScript เพื่อใช้งานหน้านี้</p></noscript>
+
+<header class="topbar">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 36 36" aria-hidden="true">
+      <g style="isolation:isolate">
+        <circle cx="13.5" cy="14" r="9" fill="#ff4d4d" style="mix-blend-mode:screen"/>
+        <circle cx="22.5" cy="14" r="9" fill="#2fd27a" style="mix-blend-mode:screen"/>
+        <circle cx="18" cy="21.8" r="9" fill="#3d8bff" style="mix-blend-mode:screen"/>
+      </g>
+    </svg>
+    <div>
+      <div class="brand-name">CM-34725 <span>RGB Colorimeter</span></div>
+      <div class="brand-sub">ESP32-C3 Super Mini · TCS34725 · BLE / USB</div>
+    </div>
+  </div>
+  <div class="conn">
+    <button class="btn" id="btnBle" title="เชื่อมต่อผ่าน Bluetooth Low Energy">BLE</button>
+    <button class="btn" id="btnUsb" title="เชื่อมต่อผ่านสาย USB (Web Serial)">USB</button>
+    <button class="btn ghost" id="btnDemo" title="จำลองข้อมูล ไม่ต้องมีอุปกรณ์">Demo</button>
+    <button class="btn danger" id="btnDisc" hidden>Disconnect</button>
+  </div>
+  <div class="lamps" aria-label="Status lamps">
+    <div class="lamp" id="lampLink"><i></i>LINK</div>
+    <div class="lamp" id="lampData"><i></i>DATA</div>
+    <div class="lamp" id="lampSat"><i></i>SAT</div>
+    <div class="lamp" id="lampHold"><i></i>HOLD</div>
+    <div class="lamp" id="lampRec"><i></i>REC</div>
+  </div>
+</header>
+
+<div class="statusbar">
+  <span><b>LINK</b><em id="sbLink">OFFLINE</em></span>
+  <span><b>BOARD</b><em id="sbBoard">—</em></span>
+  <span><b>FW</b><em id="sbFw">—</em></span>
+  <span><b>SENSOR</b><em id="sbSensor">—</em></span>
+  <span><b>GAIN</b><em id="sbGain">—</em></span>
+  <span><b>T<sub>INT</sub></b><em id="sbIt">—</em></span>
+  <span><b>STREAM</b><em id="sbStream">—</em></span>
+  <span><b>CAL</b><em id="sbCal">—</em></span>
+</div>
+
+<main class="layout">
+  <!-- 01 SAMPLE -->
+  <section class="panel a-sample">
+    <div class="ph"><span class="ph-idx">01</span>Sample<span class="ph-right"><span class="tag warn" id="wbTag" title="White balance">WB UNCAL</span></span></div>
+    <div class="pb">
+      <div class="swatch-frame">
+        <div class="swatch" id="swatch">
+          <div class="sat-flag" id="satFlag" hidden>SATURATED</div>
+          <div class="ref-chip" id="refChip" hidden><span>REF</span></div>
+        </div>
+      </div>
+      <div class="hexline"><output id="vHex">#——————</output><button class="btn ghost sm" id="btnCopy">Copy</button></div>
+      <div class="cname" id="vName">—</div>
+      <dl class="kv">
+        <dt>sRGB</dt><dd id="vRgb">—</dd>
+        <dt>HSV</dt><dd id="vHsv">—</dd>
+        <dt>HSL</dt><dd id="vHsl">—</dd>
+        <dt>CIE L*a*b*</dt><dd id="vLab">—</dd>
+        <dt>CIE xy</dt><dd id="vXy">—</dd>
+      </dl>
+      <div class="de">
+        <div><div class="lbl">ΔE<sub>00</sub> vs REF</div><div class="de-val" id="vDe">—</div></div>
+        <div class="de-verdict" id="vDeTxt">ยังไม่ได้ตั้งสีอ้างอิง</div>
+      </div>
+      <div class="btnrow">
+        <button class="btn" id="btnRef">Set REF<kbd>R</kbd></button>
+        <button class="btn ghost" id="btnRefClr">Clear REF</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- 02 CHANNELS -->
+  <section class="panel a-chan">
+    <div class="ph"><span class="ph-idx">02</span>Channels · raw counts<span class="ph-right" id="vFs">—</span></div>
+    <div id="meters"></div>
+    <div class="ph"><span class="ph-idx">02B</span>Photometry<span class="ph-right">วัดแสงแวดล้อม — ควรปิด LED</span></div>
+    <div class="readouts">
+      <div class="ro big" title="ความสว่าง (illuminance) ตามวิธี AMS DN40"><div class="lbl">Illuminance</div><div class="v"><span id="vLux">—</span><u>lx</u></div></div>
+      <div class="ro big" title="อุณหภูมิสีสัมพัทธ์ ตามวิธี AMS DN40"><div class="lbl">CCT · DN40</div><div class="v"><span id="vCct">—</span><u>K</u></div></div>
+      <div class="ro" title="อุณหภูมิสีจากพิกัด xy (สูตร McCamy)"><div class="lbl">CCT · McCamy</div><div class="v"><span id="vCct2">—</span><u>K</u></div></div>
+      <div class="ro" title="ส่วนประกอบอินฟราเรดโดยประมาณ (R+G+B−C)/2"><div class="lbl">IR component</div><div class="v"><span id="vIr">—</span><u>cnt</u></div></div>
+      <div class="ro" title="พิกัดสีของแหล่งกำเนิดแสง จากเมทริกซ์ AMS DN25"><div class="lbl">Source xy · DN25</div><div class="v sm"><span id="vSxy">—</span></div></div>
+      <div class="ro"><div class="lbl">Sample rate</div><div class="v"><span id="vHz">—</span><u>Hz</u></div></div>
+    </div>
+  </section>
+
+  <!-- 03 CONTROLS -->
+  <section class="panel a-ctrl">
+    <div class="ph"><span class="ph-idx">03</span>Controls</div>
+    <div class="ctrl-grid">
+      <div class="cgroup">
+        <div class="cg-title">Illumination LED</div>
+        <div class="led-row">
+          <button class="switch lg" id="swLed" role="switch" aria-checked="false" aria-label="Sensor LED" data-dev><span class="knob"></span></button>
+          <div><div class="led-state" id="vLedTxt">LED OFF</div><div class="hint" style="margin:0">ไฟส่องบนบอร์ดเซนเซอร์ · คีย์ <kbd>L</kbd></div></div>
+        </div>
+        <label class="slider"><span>Brightness</span><input type="range" id="rngPwr" min="0" max="100" step="5" value="100" data-dev><output id="vPwr">—</output></label>
+      </div>
+
+      <div class="cgroup">
+        <div class="cg-title">Acquisition</div>
+        <div class="field"><span>Gain <i class="auto-tag" hidden>AUTO</i></span>
+          <div class="seg" id="segGain"><button data-v="1" data-dev>1×</button><button data-v="4" data-dev>4×</button><button data-v="16" data-dev>16×</button><button data-v="60" data-dev>60×</button></div></div>
+        <div class="field"><span>Integration <i class="auto-tag" hidden>AUTO</i></span><select class="inp" id="selIt" data-dev></select></div>
+        <div class="field"><span title="ปรับ Gain/Integration อัตโนมัติไม่ให้สัญญาณอิ่มตัว">Auto-range</span><button class="switch" id="swAgc" role="switch" aria-checked="false" aria-label="Auto-range" data-dev><span class="knob"></span></button></div>
+        <div class="field"><span title="ช่วงเวลาส่งข้อมูล — firmware เฉลี่ยทุกรอบที่วัดได้ในช่วงนี้">Stream interval</span><select class="inp" id="selRate" data-dev></select></div>
+        <div class="field"><span title="ค่าเฉลี่ยเคลื่อนที่ในหน้าเว็บ">Averaging</span><select class="inp" id="selAvg"></select></div>
+        <div class="btnrow" style="margin-top:12px">
+          <button class="btn" id="btnRun" data-dev>■ Stop</button>
+          <button class="btn" id="btnRead" data-dev title="วัดหนึ่งครั้ง">Measure<kbd>M</kbd></button>
+          <button class="btn" id="btnHold" title="ค้างค่าบนหน้าจอ">Hold<kbd>H</kbd></button>
+        </div>
+      </div>
+
+      <div class="cgroup">
+        <div class="cg-title">Calibration</div>
+        <div class="cal-row"><button class="btn" id="btnDark" data-dev>Dark</button><span class="cal-st" id="vDark">not set</span></div>
+        <div class="cal-row"><button class="btn" id="btnWhite" data-dev>White</button><span class="cal-st" id="vWhite">not set</span></div>
+        <button class="btn ghost sm" id="btnCalClr">Reset calibration</button>
+        <p class="hint"><b>DARK</b> — ระบบปิด LED ชั่วคราวเพื่อวัดแสงรบกวนแล้วหักออก<br><b>WHITE</b> — วางกระดาษขาว/แผ่นอ้างอิงสีขาว ที่ระยะเดียวกับการวัดจริง แล้วกด</p>
+      </div>
+
+      <div class="cgroup">
+        <div class="cg-title">Device</div>
+        <div class="field" id="fieldPix" hidden><span>Board RGB LED</span>
+          <select class="inp" id="selPix" data-dev><option value="off">Off</option><option value="auto">Auto · firmware</option><option value="sync">Sync · calibrated</option></select></div>
+        <div class="btnrow">
+          <button class="btn ghost" id="btnSave" data-dev title="บันทึกค่าตั้งปัจจุบันลงหน่วยความจำของบอร์ด">Save to device</button>
+          <button class="btn ghost" id="btnInfo" data-dev>Refresh</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 04 TABS -->
+  <section class="panel a-tabs">
+    <div class="tabbar" role="tablist">
+      <button class="tab active" data-tab="chart" role="tab">Time series</button>
+      <button class="tab" data-tab="cie" role="tab">CIE 1931</button>
+      <button class="tab" data-tab="abs" role="tab">Absorbance</button>
+      <button class="tab" data-tab="log" role="tab">Data log<span class="badge" id="logCount">0</span></button>
+      <button class="tab" data-tab="console" role="tab">Console</button>
+      <button class="tab" data-tab="guide" role="tab">Guide</button>
+    </div>
+
+    <div class="tabpane active" id="tab-chart">
+      <div class="toolbar">
+        <div class="seg" id="segMode"><button data-v="raw">Raw</button><button data-v="sig">Signal</button><button data-v="abs">Abs</button></div>
+        <div class="seg" id="segSpan"><button data-v="30">30 s</button><button data-v="120">2 min</button><button data-v="600">10 min</button></div>
+        <label class="chip" style="--chc:var(--ch-r)"><input type="checkbox" data-ch="r">R</label>
+        <label class="chip" style="--chc:var(--ch-g)"><input type="checkbox" data-ch="g">G</label>
+        <label class="chip" style="--chc:var(--ch-b)"><input type="checkbox" data-ch="b">B</label>
+        <label class="chip" style="--chc:var(--ch-c)"><input type="checkbox" data-ch="c">C</label>
+        <span class="grow"></span>
+        <button class="btn ghost sm" id="btnChartClr">Clear</button>
+      </div>
+      <div class="canvas-wrap"><canvas id="chart"></canvas></div>
+    </div>
+
+    <div class="tabpane" id="tab-cie">
+      <div class="cie-grid">
+        <div class="canvas-wrap"><canvas id="cie"></canvas></div>
+        <div class="legend">
+          <div class="item"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="none" stroke="#fff" stroke-width="2"/></svg><span class="lbl">Sample · sRGB</span><span class="val" id="cieSample">—</span></div>
+          <div class="item"><svg viewBox="0 0 16 16"><path d="M8 2 14 8 8 14 2 8Z" fill="none" stroke="#f2a93b" stroke-width="2"/></svg><span class="lbl">Source · DN25</span><span class="val" id="cieSource">—</span></div>
+          <div class="item"><svg viewBox="0 0 16 16"><rect x="3" y="3" width="10" height="10" fill="none" stroke="#58a6ff" stroke-width="2"/></svg><span class="lbl">Reference</span><span class="val" id="cieRef">—</span></div>
+          <div class="item"><svg viewBox="0 0 16 16"><path d="M1 12C5 11 9 7 15 3" fill="none" stroke="#c4ccd2" stroke-width="1.5"/></svg><span class="lbl">Planckian locus</span><span class="val">1667–25000 K</span></div>
+          <div class="item"><svg viewBox="0 0 16 16"><path d="M3 13 8 3 13 13Z" fill="none" stroke="#c4ccd2" stroke-width="1.2" stroke-dasharray="2 2"/></svg><span class="lbl">sRGB gamut · D65</span><span class="val">primaries</span></div>
+          <button class="btn ghost sm" id="btnTrailClr">Clear trail</button>
+          <p class="hint" style="margin:0">จุดวงกลม = สีของวัตถุ (หลัง White balance) · จุดเพชร = สีของแสงที่ตกกระทบเซนเซอร์ ใช้ดูอุณหภูมิสีของแหล่งกำเนิดแสง</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tabpane" id="tab-abs">
+      <div class="abs-grid">
+        <div>
+          <div class="cg-title">Transmittance &amp; Absorbance</div>
+          <div class="row-inline">
+            <button class="btn primary" id="btnBlank" data-dev>Blank (I₀)</button>
+            <button class="btn ghost sm" id="btnBlankClr">Clear</button>
+            <span class="cal-st" id="vBlank">not set</span>
+          </div>
+          <table class="data">
+            <thead><tr><th class="l">Ch</th><th>I₀</th><th>I</th><th>%T</th><th>A</th></tr></thead>
+            <tbody id="absBody"></tbody>
+          </table>
+          <p class="hint">ใส่ cuvette ที่มีตัวทำละลายเปล่า (blank) แล้วกด BLANK จากนั้นเปลี่ยนเป็นสารตัวอย่าง · A = −log₁₀(I/I₀) · ช่องที่ดูดกลืนมากที่สุด (สีส้ม) มักเป็นสีคู่ตรงข้ามของสารละลาย · แนะนำให้ปิด Auto-range ระหว่างทดลอง</p>
+        </div>
+        <div>
+          <div class="cg-title">Standard curve · Beer–Lambert</div>
+          <div class="row-inline">
+            <label>Channel <select class="inp" id="selStdCh"><option value="r">R</option><option value="g">G</option><option value="b">B</option><option value="c">C</option></select></label>
+            <label>Unit <input class="inp" id="inpUnit" style="width:80px" maxlength="12"></label>
+            <label><input type="checkbox" id="chkZero"> ผ่านจุด 0</label>
+          </div>
+          <div class="row-inline">
+            <input class="inp" id="inpConc" type="number" step="any" min="0" placeholder="Concentration">
+            <button class="btn" id="btnAddStd" data-dev>+ Add standard</button>
+          </div>
+          <div class="table-wrap" style="max-height:180px">
+            <table class="data"><thead><tr><th class="l">#</th><th>Conc</th><th>A</th><th>Residual</th><th></th></tr></thead><tbody id="stdBody"></tbody></table>
+          </div>
+          <div class="fit">
+            <div id="vFit">ต้องมีสารมาตรฐานอย่างน้อย 2 จุด</div>
+            <div class="lbl" style="margin-top:6px">Unknown (current sample)</div>
+            <div class="unk" id="vUnk">—</div>
+          </div>
+          <div class="row-inline"><button class="btn ghost sm" id="btnStdClr">Clear standards</button></div>
+        </div>
+        <div class="abs-plot"><div class="canvas-wrap"><canvas id="stdChart"></canvas></div></div>
+      </div>
+    </div>
+
+    <div class="tabpane" id="tab-log">
+      <div class="toolbar">
+        <button class="btn rec" id="btnRec" title="บันทึกทุกค่าที่ได้รับต่อเนื่อง">● Rec</button>
+        <input class="inp" id="inpLabel" placeholder="Label / sample ID" style="width:200px" maxlength="40">
+        <button class="btn" id="btnCap" title="บันทึกค่าปัจจุบัน 1 แถว">Capture<kbd>Space</kbd></button>
+        <span class="grow"></span>
+        <button class="btn ghost" id="btnCsv">Export CSV</button>
+        <button class="btn ghost" id="btnLogClr">Clear</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data">
+          <thead><tr><th>#</th><th class="l">Time</th><th class="l">Label</th><th class="l">Color</th><th>R</th><th>G</th><th>B</th><th>C</th><th>Gain</th><th>T ms</th><th>L*</th><th>a*</th><th>b*</th><th>Lux</th><th>CCT</th><th>A(R)</th><th>A(G)</th><th>A(B)</th><th>ΔE00</th></tr></thead>
+          <tbody id="logBody"></tbody>
+        </table>
+      </div>
+      <p class="hint">ตารางแสดง 300 แถวล่าสุด · ไฟล์ CSV มีข้อมูลครบทุกแถวและทุกคอลัมน์ (เปิดใน Excel / Google Sheets ได้)</p>
+    </div>
+
+    <div class="tabpane" id="tab-console">
+      <div class="toolbar">
+        <label class="row-inline" style="margin:0"><input type="checkbox" id="chkConData"> แสดงบรรทัดข้อมูล (D,…)</label>
+        <span class="grow"></span>
+        <button class="btn ghost sm" id="btnConClr">Clear</button>
+      </div>
+      <pre class="console" id="con"></pre>
+      <form class="con-input" id="conForm" autocomplete="off">
+        <span>&gt;</span><input class="inp" id="conCmd" placeholder="เช่น LED 1 · GAIN 16 · IT 154 · AGC 1 · INFO" data-dev>
+        <button class="btn sm" data-dev>Send</button>
+      </form>
+    </div>
+
+    <div class="tabpane" id="tab-guide">
+      <figure class="wiring">
+        <a href="wiring.svg" target="_blank" rel="noopener"><img src="wiring.svg" alt="แผนผังการต่อวงจร ESP32-C3 Super Mini กับ TCS34725" onerror="this.closest('figure').remove()"></a>
+        <figcaption>คลิกที่ภาพเพื่อเปิดเต็มจอหรือสั่งพิมพ์ (ไฟล์ wiring.svg)</figcaption>
+      </figure>
+      <div class="guide">
+        <div>
+          <h3>Wiring</h3>
+          <table class="data">
+            <thead><tr><th>TCS34725</th><th>ESP32-C3 Super Mini</th></tr></thead>
+            <tbody>
+              <tr><td>VIN</td><td>3V3 (ห้ามใช้ 5V)</td></tr>
+              <tr><td>GND</td><td>GND</td></tr>
+              <tr><td>SDA</td><td>GPIO 3</td></tr>
+              <tr><td>SCL</td><td>GPIO 4</td></tr>
+              <tr><td>LED</td><td>GPIO 1</td></tr>
+              <tr><td>3V3, INT</td><td>ไม่ต้องต่อ</td></tr>
+            </tbody>
+          </table>
+          <p class="hint">ห้ามต่ออุปกรณ์ที่ GPIO 2, 8, 9 (ขาบูต) · ไฟสีฟ้าบนบอร์ด (GPIO 8) กะพริบทุกครั้งที่ส่งข้อมูล · ปุ่ม BOOT (GPIO 9) = เปิด/ปิด LED ของเซนเซอร์ · ชื่อขาพิมพ์อยู่ด้านหลังบอร์ด</p>
+        </div>
+        <div>
+          <h3>Quick start</h3>
+          <ol>
+            <li>อัปโหลด firmware <code>RGBMeter.ino</code> (Board: ESP32C3 Dev Module · USB CDC On Boot = Enabled)</li>
+            <li>เปิดหน้านี้ด้วย Chrome หรือ Edge แล้วกด <b>BLE</b> หรือ <b>USB</b></li>
+            <li>กด <b>DARK</b> แล้ววางกระดาษขาวกด <b>WHITE</b></li>
+            <li>วางวัตถุ อ่านค่าสี · <b>Set REF</b> เพื่อเทียบ ΔE</li>
+            <li>งานสารละลาย: แท็บ <b>Absorbance</b> → BLANK → เพิ่มสารมาตรฐาน → อ่านความเข้มข้นของสารที่ไม่ทราบค่า</li>
+            <li>ไม่มีอุปกรณ์? กด <b>Demo</b> เพื่อทดลองหน้าเว็บ</li>
+          </ol>
+        </div>
+        <div>
+          <h3>Keyboard</h3>
+          <table class="data"><tbody>
+            <tr><td><kbd>L</kbd></td><td>เปิด/ปิด LED</td></tr>
+            <tr><td><kbd>M</kbd></td><td>วัดหนึ่งครั้ง</td></tr>
+            <tr><td><kbd>H</kbd></td><td>Hold ค้างค่า</td></tr>
+            <tr><td><kbd>R</kbd></td><td>ตั้งสีปัจจุบันเป็นสีอ้างอิง</td></tr>
+            <tr><td><kbd>Space</kbd></td><td>บันทึกค่าลง Data log</td></tr>
+          </tbody></table>
+        </div>
+        <div>
+          <h3>Commands (USB / BLE)</h3>
+          <table class="data"><tbody>
+            <tr><td><code>LED 0|1|T</code></td><td>ปิด / เปิด / สลับ</td></tr>
+            <tr><td><code>PWR 0–100</code></td><td>ความสว่าง LED (%)</td></tr>
+            <tr><td><code>GAIN 1|4|16|60</code></td><td>อัตราขยาย</td></tr>
+            <tr><td><code>IT ms</code> · <code>ATIME n</code></td><td>เวลาอินทิเกรต 2.4–614 ms</td></tr>
+            <tr><td><code>AGC 0|1</code></td><td>Auto-range</td></tr>
+            <tr><td><code>RATE ms</code> · <code>STREAM 0|1</code></td><td>อัตราส่งข้อมูล / เปิด-ปิด</td></tr>
+            <tr><td><code>READ</code></td><td>วัดหนึ่งครั้ง</td></tr>
+            <tr><td><code>PIX OFF|AUTO|r g b</code></td><td>ไฟ RGB บนบอร์ด (เฉพาะ S3)</td></tr>
+            <tr><td><code>SAVE</code> · <code>DEFAULTS</code> · <code>INFO</code></td><td>บันทึก / ค่าเริ่มต้น / ข้อมูล</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>Web Serial &amp; Web Bluetooth ต้องใช้ Chrome หรือ Edge (Windows · macOS · Linux · ChromeOS) · Android รองรับเฉพาะ BLE · Lux/CCT เป็นค่าประมาณตาม AMS DN40</footer>
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================================ constants ================================ */
+const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
+const NUS_RX = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';   // host → device (write)
+const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';   // device → host (notify)
+const GAINS = [1, 4, 16, 60];
+const IT_CYCLES = [1, 2, 5, 10, 21, 42, 64, 83, 125, 167, 208, 256];  // × 2.4 ms
+const RATES = [0, 50, 100, 200, 500, 1000, 2000, 5000];
+const AVGS = [1, 2, 4, 8, 16, 32];
+const CH = ['r', 'g', 'b', 'c'];
+const CH_NAME = { r: 'R', g: 'G', b: 'B', c: 'C' };
+// Auto-range ladder used by the demo device — mirrors AGC_STEPS in the firmware: [gain index, ATIME]
+const AGC_LADDER = [[3, 0x00], [3, 0xC0], [2, 0xC0], [1, 0xC0], [0, 0xC0], [0, 0xF6], [0, 0xFF]];
+const FONT_MONO = '"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace';
+const enc = new TextEncoder();
+
+/* ================================ helpers ================================ */
+const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
+const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const fin = Number.isFinite;
+const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+const stdev = a => { const m = mean(a); return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / (a.length - 1)); };
+const f = (v, d = 0) => fin(v) ? v.toFixed(d) : '—';
+const fInt = v => fin(v) ? Math.round(v).toLocaleString('en-US') : '—';
+const fSig = v => !fin(v) ? '—' : Math.abs(v) >= 100 ? v.toFixed(1) : Math.abs(v) >= 10 ? v.toFixed(2) : v.toFixed(3);
+const hex2 = n => n.toString(16).padStart(2, '0');
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) {} },
+};
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const COL = {
+  r: cssv('--ch-r'), g: cssv('--ch-g'), b: cssv('--ch-b'), c: cssv('--ch-c'),
+  grid: 'rgba(255,255,255,.06)', axis: cssv('--line-2'), faint: cssv('--text-faint'),
+  dim: cssv('--text-dim'), text: cssv('--text'), accent: cssv('--accent'), bad: cssv('--bad'),
+};
+
+function toast(msg, kind = 'info', ms = 3800) {
+  const el = document.createElement('div');
+  el.className = `toast ${kind}`;
+  el.textContent = msg;
+  $('#toasts').appendChild(el);
+  setTimeout(() => el.remove(), ms);
+}
+
+/* ================================ colour science ================================ */
+const M_RGB2XYZ = [[0.4124564, 0.3575761, 0.1804375], [0.2126729, 0.7151522, 0.0721750], [0.0193339, 0.1191920, 0.9503041]];
+const M_XYZ2RGB = [[3.2404542, -1.5371385, -0.4985314], [-0.9692660, 1.8760108, 0.0415560], [0.0556434, -0.2040259, 1.0572252]];
+const M_DN25 = [[-0.14282, 1.54924, -0.95641], [-0.32466, 1.57837, -0.73191], [-0.68202, 0.77073, 0.56332]];  // TCS34725 RGB → XYZ (AMS DN25)
+const D65 = [0.95047, 1, 1.08883];
+const mul3 = (M, v) => M.map(r => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]);
+const srgbEnc = u => u <= 0.0031308 ? 12.92 * u : 1.055 * Math.pow(u, 1 / 2.4) - 0.055;
+const srgbDec = u => u <= 0.04045 ? u / 12.92 : Math.pow((u + 0.055) / 1.055, 2.4);
+const toXy = ([X, Y, Z]) => { const s = X + Y + Z; return s > 0 ? [X / s, Y / s] : [NaN, NaN]; };
+
+function xyzToLab([X, Y, Z]) {
+  const g = t => t > 216 / 24389 ? Math.cbrt(t) : (24389 / 27 * t + 16) / 116;
+  const fx = g(X / D65[0]), fy = g(Y / D65[1]), fz = g(Z / D65[2]);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+
+function deltaE2000([L1, a1, b1], [L2, a2, b2]) {
+  const rad = Math.PI / 180, deg = 180 / Math.PI, p7 = 25 ** 7;
+  const Cb = (Math.hypot(a1, b1) + Math.hypot(a2, b2)) / 2;
+  const G = 0.5 * (1 - Math.sqrt(Cb ** 7 / (Cb ** 7 + p7)));
+  const a1p = (1 + G) * a1, a2p = (1 + G) * a2;
+  const C1 = Math.hypot(a1p, b1), C2 = Math.hypot(a2p, b2);
+  const h1 = (Math.atan2(b1, a1p) * deg + 360) % 360, h2 = (Math.atan2(b2, a2p) * deg + 360) % 360;
+  let dh = 0;
+  if (C1 * C2) { dh = h2 - h1; if (dh > 180) dh -= 360; else if (dh < -180) dh += 360; }
+  const dL = L2 - L1, dC = C2 - C1, dH = 2 * Math.sqrt(C1 * C2) * Math.sin(dh * rad / 2);
+  const Lm = (L1 + L2) / 2, Cm = (C1 + C2) / 2;
+  let hm = h1 + h2;
+  if (C1 * C2) { if (Math.abs(h1 - h2) > 180) hm += hm < 360 ? 360 : -360; hm /= 2; }
+  const T = 1 - 0.17 * Math.cos((hm - 30) * rad) + 0.24 * Math.cos(2 * hm * rad) + 0.32 * Math.cos((3 * hm + 6) * rad) - 0.20 * Math.cos((4 * hm - 63) * rad);
+  const dTh = 30 * Math.exp(-(((hm - 275) / 25) ** 2));
+  const RC = 2 * Math.sqrt(Cm ** 7 / (Cm ** 7 + p7));
+  const SL = 1 + 0.015 * (Lm - 50) ** 2 / Math.sqrt(20 + (Lm - 50) ** 2), SC = 1 + 0.045 * Cm, SH = 1 + 0.015 * Cm * T;
+  const RT = -Math.sin(2 * dTh * rad) * RC;
+  return Math.sqrt((dL / SL) ** 2 + (dC / SC) ** 2 + (dH / SH) ** 2 + RT * (dC / SC) * (dH / SH));
+}
+
+function hsvHsl(rgb8) {
+  const [r, g, b] = rgb8.map(v => v / 255);
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+  let h = 0;
+  if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+  const l = (mx + mn) / 2;
+  return { hsv: [h, mx ? d / mx * 100 : 0, mx * 100], hsl: [h, d ? d / (1 - Math.abs(2 * l - 1)) * 100 : 0, l * 100] };
+}
+
+const cctMcCamy = (x, y) => { const n = (x - 0.3320) / (0.1858 - y); return 449 * n ** 3 + 3525 * n ** 2 + 6823.3 * n + 5520.33; };
+
+function planckXY(T) {  // Kim et al. cubic spline, 1667–25000 K
+  const x = T <= 4000
+    ? -0.2661239e9 / T ** 3 - 0.2343589e6 / T ** 2 + 0.8776956e3 / T + 0.179910
+    : -3.0258469e9 / T ** 3 + 2.1070379e6 / T ** 2 + 0.2226347e3 / T + 0.240390;
+  const y = T <= 2222 ? -1.1063814 * x ** 3 - 1.34811020 * x ** 2 + 2.18555832 * x - 0.20219683
+    : T <= 4000 ? -0.9549476 * x ** 3 - 1.37418593 * x ** 2 + 2.09137015 * x - 0.16748867
+    : 3.0817580 * x ** 3 - 5.87338670 * x ** 2 + 3.75112997 * x - 0.37001483;
+  return [x, y];
+}
+
+const NAMES = [
+  ['#000000', 'Black', 'ดำ'], ['#404040', 'Dark gray', 'เทาเข้ม'], ['#808080', 'Gray', 'เทา'], ['#c0c0c0', 'Silver', 'เทาเงิน'],
+  ['#ffffff', 'White', 'ขาว'], ['#ff0000', 'Red', 'แดง'], ['#dc143c', 'Crimson', 'แดงเข้ม'], ['#800000', 'Maroon', 'แดงเลือดหมู'],
+  ['#ffc0cb', 'Pink', 'ชมพู'], ['#ff69b4', 'Hot pink', 'ชมพูสด'], ['#ff7f50', 'Coral', 'ส้มอมชมพู'], ['#ffa500', 'Orange', 'ส้ม'],
+  ['#ff8c00', 'Dark orange', 'ส้มเข้ม'], ['#8b4513', 'Brown', 'น้ำตาล'], ['#d2b48c', 'Tan', 'น้ำตาลอ่อน'], ['#ffd700', 'Gold', 'เหลืองทอง'],
+  ['#ffff00', 'Yellow', 'เหลือง'], ['#f0e68c', 'Khaki', 'กากี'], ['#808000', 'Olive', 'เขียวมะกอก'], ['#9acd32', 'Yellow green', 'เขียวอมเหลือง'],
+  ['#00ff00', 'Lime', 'เขียวสด'], ['#008000', 'Green', 'เขียว'], ['#006400', 'Dark green', 'เขียวเข้ม'], ['#008080', 'Teal', 'เขียวหัวเป็ด'],
+  ['#40e0d0', 'Turquoise', 'ฟ้าอมเขียว'], ['#00ffff', 'Cyan', 'ฟ้าน้ำทะเล'], ['#87ceeb', 'Sky blue', 'ฟ้า'], ['#4169e1', 'Royal blue', 'น้ำเงินสด'],
+  ['#0000ff', 'Blue', 'น้ำเงิน'], ['#000080', 'Navy', 'กรมท่า'], ['#4b0082', 'Indigo', 'คราม'], ['#800080', 'Purple', 'ม่วง'],
+  ['#ee82ee', 'Violet', 'ม่วงอ่อน'], ['#ff00ff', 'Magenta', 'บานเย็น'], ['#e6e6fa', 'Lavender', 'ม่วงลาเวนเดอร์'], ['#f5f5dc', 'Beige', 'เบจ'],
+  ['#fffdd0', 'Cream', 'ครีม'],
+].map(([hex, en, th]) => {
+  const n = parseInt(hex.slice(1), 16);
+  const lin = [n >> 16, (n >> 8) & 255, n & 255].map(v => srgbDec(v / 255));
+  return { hex, en, th, lab: xyzToLab(mul3(M_RGB2XYZ, lin)) };
+});
+function nearestName(lab) {
+  let best = NAMES[0], bd = Infinity;
+  for (const c of NAMES) { const d = deltaE2000(lab, c.lab); if (d < bd) { bd = d; best = c; } }
+  return { ...best, de: bd };
+}
+
+// TCS34725 full-scale and saturation levels (AMS DN40: analog "ripple" saturation below 64 cycles)
+const satLevel = cyc => cyc > 63 ? 65535 : Math.floor(1024 * cyc * 0.75);
+
+function linfit(pts, zero) {
+  const n = pts.length;
+  if (n < (zero ? 1 : 2)) return null;
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (const [x, y] of pts) { sx += x; sy += y; sxx += x * x; sxy += x * y; }
+  let m, b;
+  if (zero) { if (!sxx) return null; m = sxy / sxx; b = 0; }
+  else { const den = n * sxx - sx * sx; if (!den) return null; m = (n * sxy - sx * sy) / den; b = (sy - m * sx) / n; }
+  const my = sy / n;
+  let ssr = 0, sst = 0;
+  for (const [x, y] of pts) { ssr += (y - (m * x + b)) ** 2; sst += (y - my) ** 2; }
+  return { m, b, r2: sst ? 1 - ssr / sst : 1, n };
+}
+
+function niceTicks(lo, hi, n) {
+  const raw = (hi - lo) / n, mag = 10 ** Math.floor(Math.log10(raw)), q = raw / mag;
+  const step = (q < 1.5 ? 1 : q < 3 ? 2 : q < 7 ? 5 : 10) * mag;
+  const a = Math.floor(lo / step + 1e-9) * step, b = Math.ceil(hi / step - 1e-9) * step;
+  const ticks = [];
+  for (let v = a; v <= b + step / 2; v += step) ticks.push(Math.abs(v) < step * 1e-9 ? 0 : v);
+  return { lo: a, hi: b, step, ticks };
+}
+function fmtTick(v, step) {
+  if (step >= 1000) return (v / 1000).toFixed(step >= 10000 ? 0 : 1) + 'k';
+  return v.toFixed(Math.max(0, -Math.floor(Math.log10(step) + 1e-9)));
+}
+
+/* ================================ transports ================================ */
+class LineSplitter {
+  constructor(onLine) { this.buf = ''; this.onLine = onLine; }
+  push(text) {
+    this.buf += text;
+    let i;
+    while ((i = this.buf.indexOf('\n')) >= 0) {
+      const line = this.buf.slice(0, i).trim();
+      this.buf = this.buf.slice(i + 1);
+      if (line) this.onLine(line);
+    }
+    if (this.buf.length > 4096) this.buf = '';
+  }
+}
+
+class SerialTransport {
+  constructor(h) { this.h = h; this.kind = 'usb'; this.label = 'USB'; this.split = new LineSplitter(h.onLine); this.closing = false; }
+  async connect() {
+    if (!('serial' in navigator)) throw new Error('เบราว์เซอร์นี้ไม่รองรับ Web Serial — ใช้ Chrome หรือ Edge บนคอมพิวเตอร์');
+    this.port = await navigator.serial.requestPort();
+    await this.port.open({ baudRate: 115200 });
+    try { await this.port.setSignals({ dataTerminalReady: true, requestToSend: false }); } catch (_) {}
+    const i = this.port.getInfo();
+    this.name = i.usbVendorId != null ? `${hex2(i.usbVendorId >> 8)}${hex2(i.usbVendorId & 255)}:${hex2(i.usbProductId >> 8)}${hex2(i.usbProductId & 255)}` : 'serial port';
+    this.writer = this.port.writable.getWriter();
+    this.done = this.readLoop();
+  }
+  async readLoop() {
+    const dec = new TextDecoder();
+    while (this.port.readable && !this.closing) {
+      this.reader = this.port.readable.getReader();
+      try {
+        for (;;) {
+          const { value, done } = await this.reader.read();
+          if (done) break;
+          this.split.push(dec.decode(value, { stream: true }));
+        }
+      } catch (_) { /* non-fatal errors re-acquire a reader; a lost device leaves port.readable null */ }
+      finally { this.reader.releaseLock(); }
+    }
+    if (!this.closing) { this.closing = true; await this.abort(); this.h.onClose('lost'); }
+  }
+  async abort() {
+    try { this.writer?.releaseLock(); } catch (_) {}
+    try { await this.port?.close(); } catch (_) {}
+  }
+  async send(line) { await this.writer.write(enc.encode(line + '\n')); }
+  async disconnect() {
+    if (this.closing) return;
+    this.closing = true;
+    try { await this.reader?.cancel(); } catch (_) {}
+    await this.done;
+    await this.abort();
+    this.h.onClose('user');
+  }
+}
+
+class BleTransport {
+  constructor(h) { this.h = h; this.kind = 'ble'; this.label = 'BLE'; this.split = new LineSplitter(h.onLine); this.q = Promise.resolve(); this.closing = false; }
+  async connect() {
+    if (!navigator.bluetooth) throw new Error('เบราว์เซอร์นี้ไม่รองรับ Web Bluetooth — ใช้ Chrome/Edge บนคอมพิวเตอร์หรือ Android');
+    this.device = await navigator.bluetooth.requestDevice({
+      filters: [{ services: [NUS_SERVICE] }, { namePrefix: 'RGBMeter' }],
+      optionalServices: [NUS_SERVICE],
+    });
+    this.name = this.device.name || 'BLE device';
+    this.onDisc = () => { if (!this.closing) { this.closing = true; this.h.onClose('lost'); } };
+    this.device.addEventListener('gattserverdisconnected', this.onDisc);
+    const server = await this.device.gatt.connect();
+    const svc = await server.getPrimaryService(NUS_SERVICE);
+    this.rx = await svc.getCharacteristic(NUS_RX);
+    this.tx = await svc.getCharacteristic(NUS_TX);
+    const dec = new TextDecoder();
+    this.tx.addEventListener('characteristicvaluechanged', e => this.split.push(dec.decode(e.target.value, { stream: true })));
+    await this.tx.startNotifications();
+  }
+  send(line) {
+    const bytes = enc.encode(line + '\n');
+    const job = this.q.then(async () => {   // GATT operations must not overlap
+      for (let i = 0; i < bytes.length; i += 20) {
+        const chunk = bytes.slice(i, i + 20);
+        if (this.rx.writeValueWithResponse) await this.rx.writeValueWithResponse(chunk);
+        else await this.rx.writeValue(chunk);
+      }
+    });
+    this.q = job.catch(() => {});
+    return job;
+  }
+  async abort() {
+    try { this.device?.removeEventListener('gattserverdisconnected', this.onDisc); } catch (_) {}
+    try { if (this.device?.gatt.connected) this.device.gatt.disconnect(); } catch (_) {}
+  }
+  async disconnect() {
+    if (this.closing) return;
+    this.closing = true;
+    await this.abort();
+    this.h.onClose('user');
+  }
+}
+
+/** Simulated instrument speaking the same protocol, for trying the UI without hardware. */
+class DemoTransport {
+  constructor(h) {
+    this.h = h; this.kind = 'demo'; this.label = 'DEMO'; this.name = 'RGBMeter-DEMO';
+    this.s = { led: 1, pwr: 100, gain: 1, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0 };
+    this.agcIdx = 3; this.t0 = performance.now(); this.lastEmit = 0; this.acc = null; this.closed = false; this.oneShot = false;
+  }
+  async connect() { this.cycle(); }
+  async abort() { this.closed = true; clearTimeout(this.timer); }
+  async disconnect() { await this.abort(); this.h.onClose('user'); }
+  out(line) { setTimeout(() => { if (!this.closed) this.h.onLine(line); }, 2); }
+  stateLine() {
+    const s = this.s;
+    return `S,led=${s.led},pwr=${s.pwr},gain=${GAINS[s.gain]},atime=${s.atime},agc=${s.agc},rate=${s.rate},stream=${s.stream},pix=${s.pix}`;
+  }
+  agcSelect(i) { this.agcIdx = i; this.s.gain = AGC_LADDER[i][0]; this.s.atime = AGC_LADDER[i][1]; this.acc = null; }
+  async send(line) {
+    const [c0, ...rest] = line.trim().split(/\s+/);
+    const cmd = c0.toUpperCase(), arg = rest.join(' '), argU = arg.toUpperCase(), n = parseFloat(arg), s = this.s;
+    switch (cmd) {
+      case 'LED': s.led = argU === 'T' ? 1 - s.led : (n ? 1 : 0); this.acc = null; break;
+      case 'PWR': s.pwr = clamp(Math.round(n) || 0, 0, 100); this.acc = null; break;
+      case 'GAIN': s.gain = n >= 60 ? 3 : n >= 16 ? 2 : n >= 4 ? 1 : 0; s.agc = 0; this.acc = null; break;
+      case 'IT': s.atime = 256 - clamp(Math.round(n / 2.4) || 1, 1, 256); s.agc = 0; this.acc = null; break;
+      case 'ATIME': s.atime = clamp(Math.round(n) || 0, 0, 255); s.agc = 0; this.acc = null; break;
+      case 'AGC': s.agc = n ? 1 : 0; if (s.agc) { const cur = GAINS[s.gain] * (256 - s.atime); let bi = 0, bd = Infinity; AGC_LADDER.forEach(([g, a], i) => { const d = Math.abs(Math.log(GAINS[g] * (256 - a) / cur)); if (d < bd) { bd = d; bi = i; } }); this.agcSelect(bi); } break;
+      case 'RATE': s.rate = clamp(Math.round(n) || 0, 0, 60000); break;
+      case 'STREAM': s.stream = n ? 1 : 0; this.acc = null; break;
+      case 'READ': this.oneShot = true; this.acc = null; return;
+      case 'PIX': { const was = s.pix; s.pix = argU === 'AUTO' || argU === '1' ? 1 : /\d+[\s,]+\d+[\s,]+\d+/.test(arg) ? 2 : 0; if (was === 2 && s.pix === 2) return; break; }
+      case 'SAVE': this.out('#settings saved (demo)'); return;
+      case 'DEFAULTS': Object.assign(s, { led: 1, pwr: 100, gain: 1, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0 }); break;
+      case 'INFO': case '?': this.out(`I,RGBMeter,1.1.0-demo,0x44,${this.name},C3`); break;
+      case 'STATE': break;
+      default: this.out(`E,UNKNOWN_CMD,${cmd}`); return;
+    }
+    this.out(this.stateLine());
+  }
+  read() {
+    const s = this.s, cyc = 256 - s.atime, it = cyc * 2.4, t = (performance.now() - this.t0) / 1000;
+    const P = [[.78, .12, .10], [.92, .70, .08], [.12, .50, .22], [.08, .26, .72], [.50, .16, .56], [.86, .86, .83], [.18, .18, .18]];
+    const k = t / 7, i = Math.floor(k) % P.length, j = (i + 1) % P.length;
+    let u = k - Math.floor(k); u = u < 0.7 ? 0 : (u - 0.7) / 0.3; u = u * u * (3 - 2 * u);
+    const light = (s.led ? s.pwr / 100 : 0) + 0.04 + 0.01 * Math.sin(t * 0.7);
+    const [lr, lg, lb] = [0, 1, 2].map(q => (P[i][q] + (P[j][q] - P[i][q]) * u) * light);
+    const ir = 0.10 * light;
+    const resp = { r: 1.00 * lr + 0.06 * lg + 0.02 * lb + ir, g: 0.10 * lr + 0.92 * lg + 0.12 * lb + 0.6 * ir, b: 0.03 * lr + 0.14 * lg + 0.80 * lb + 0.5 * ir };
+    resp.c = (resp.r + resp.g + resp.b) * 0.92 + ir;
+    const K = 24 * GAINS[s.gain] * it, fs = Math.min(65535, 1024 * cyc);
+    const gauss = () => Math.sqrt(-2 * Math.log(1 - Math.random())) * Math.cos(2 * Math.PI * Math.random());
+    const q = v => clamp(Math.round(v * K + gauss() * (2 + v * K * 0.002)), 0, fs);
+    return { r: q(resp.r), g: q(resp.g), b: q(resp.b), c: q(resp.c) };
+  }
+  agcStep(c) {
+    const L = AGC_LADDER, i = this.agcIdx, sens = k => GAINS[L[k][0]] * (256 - L[k][1]), sat = k => satLevel(256 - L[k][1]);
+    let next = i;
+    if (c >= 0.9 * sat(i)) next = Math.min(i + 1, L.length - 1);
+    else if (i > 0 && c * sens(i - 1) / sens(i) < 0.5 * sat(i - 1)) next = i - 1;
+    if (next === i) return false;
+    this.agcSelect(next);
+    this.out(this.stateLine());
+    return true;
+  }
+  cycle() {
+    if (this.closed) return;
+    const it = (256 - this.s.atime) * 2.4;
+    this.timer = setTimeout(() => {
+      const s = this.s, v = this.read();
+      if (!(s.agc && this.agcStep(v.c)) && (s.stream || this.oneShot)) {
+        const a = this.acc || (this.acc = { r: 0, g: 0, b: 0, c: 0, n: 0 });
+        for (const ch of CH) a[ch] += v[ch];
+        a.n++;
+        const now = performance.now();
+        if (this.oneShot || now - this.lastEmit >= s.rate) {
+          this.out(`D,${CH.map(ch => (a[ch] / a.n).toFixed(1)).join(',')},${s.atime},${GAINS[s.gain]},${a.n}`);
+          this.acc = null; this.lastEmit = now; this.oneShot = false;
+        }
+      }
+      this.cycle();
+    }, Math.max(it + 2.4, 4));
+  }
+}
+
+/* ================================ state ================================ */
+let link = null;
+const dev = { info: {}, state: { led: 0, pwr: 100, gain: 4, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0 } };
+const cal = Object.assign({ dark: null, white: null }, store.get('cm.cal', {}));
+let blank = store.get('cm.blank', null);
+let ref = store.get('cm.ref', null);
+const std = Object.assign({ ch: 'g', unit: 'mg/L', zero: false, pts: [] }, store.get('cm.std', {}));
+const prefs = Object.assign({ avgN: 4, mode: 'raw', span: 120, chans: { r: true, g: true, b: true, c: true }, conData: false }, store.get('cm.ui', {}));
+const savePrefs = () => store.set('cm.ui', prefs);
+const saveCal = () => { store.set('cm.cal', cal); store.set('cm.blank', blank); updateCalUi(); };
+const saveStd = () => { store.set('cm.std', std); stdDirty = true; requestRender(); };
+
+let hold = false, recording = false, cur = null, stdDirty = true, activeTab = 'chart';
+const win = [];          // recent samples (averaging / statistics)
+const series = [];       // chart history
+const cieTrail = [];
+const rxTimes = [];
+const logRows = [];
+let logSeq = 0;
+const pending = [];      // capture jobs waiting for samples
+const stateWaiters = new Set();
+
+/* ================================ link management ================================ */
+async function connectWith(Kind) {
+  if (link) await link.disconnect();
+  const t = new Kind({ onLine: handleLine, onClose: reason => onClosed(t, reason) });
+  setLinkUi('connecting', t);
+  try {
+    await t.connect();
+  } catch (e) {
+    await t.abort?.();
+    setLinkUi('offline');
+    if (e?.name !== 'NotFoundError') toast(e?.message || String(e), 'bad', 6000);  // NotFoundError = chooser cancelled
+    return;
+  }
+  link = t;
+  win.length = 0;
+  dev.info = {};
+  setLinkUi('online', t);
+  conLog('sys', `connected via ${t.label} · ${t.name}`);
+  toast(`เชื่อมต่อแล้ว · ${t.label} · ${t.name}`, 'ok');
+  send('INFO');
+}
+
+function onClosed(t, reason) {
+  if (t !== link) return;
+  link = null;
+  setLinkUi('offline');
+  for (const job of pending.splice(0)) { clearTimeout(job.timer); job.reject(new Error('การเชื่อมต่อถูกตัด')); }
+  conLog('sys', `disconnected (${reason})`);
+  if (reason !== 'user') toast('การเชื่อมต่อขาดหาย', 'bad');
+}
+
+async function send(cmd, quiet = false) {
+  if (!link) { if (!quiet) toast('ยังไม่ได้เชื่อมต่ออุปกรณ์', 'warn'); return false; }
+  conLog('tx', cmd, quiet);
+  try { await link.send(cmd); return true; }
+  catch (e) {
+    conLog('err', `send failed: ${e.message}`);
+    if (!quiet) toast(`ส่งคำสั่งไม่สำเร็จ: ${e.message}`, 'bad');
+    return false;
+  }
+}
+
+function waitState(pred, ms = 3000) {
+  return new Promise((resolve, reject) => {
+    const w = { pred, resolve, timer: setTimeout(() => { stateWaiters.delete(w); reject(new Error('อุปกรณ์ไม่ตอบสนอง')); }, ms) };
+    stateWaiters.add(w);
+  });
+}
+
+/* ================================ protocol ================================ */
+const errSeen = {};
+function handleLine(line) {
+  conLog('rx', line, line.startsWith('D,'));
+  const p = line.split(',');
+  switch (p[0]) {
+    case 'D': {
+      const s = { r: +p[1], g: +p[2], b: +p[3], c: +p[4], atime: +p[5], gain: +p[6], n: +(p[7] || 1), t: performance.now() };
+      if ([s.r, s.g, s.b, s.c, s.atime, s.gain].every(fin)) onSample(s);
+      break;
+    }
+    case 'S': {
+      const o = {};
+      for (const kv of p.slice(1)) { const [k, v] = kv.split('='); if (k && fin(+v)) o[k.trim()] = +v; }
+      applyState(o);
+      break;
+    }
+    case 'I':
+      dev.info = { model: p[1], fw: p[2], id: p[3], name: p[4], board: p[5] || 'S3' };  // fw 1.0.0 was S3-only
+      $('#fieldPix').hidden = dev.info.board !== 'S3';   // only the S3 Super Mini has an RGB LED
+      updateStatus();
+      break;
+    case 'E': {
+      const now = Date.now();
+      if (!errSeen[p[1]] || now - errSeen[p[1]] > 15000) {
+        errSeen[p[1]] = now;
+        toast(`Device: ${p[1]}${p.length > 2 ? ' — ' + p.slice(2).join(',') : ''}`, 'bad', 6000);
+      }
+      break;
+    }
+  }
+}
+
+function applyState(o) {
+  Object.assign(dev.state, o);
+  const s = dev.state;
+  setSwitch($('#swLed'), !!s.led);
+  $('#vLedTxt').textContent = s.led ? `LED ON · ${s.pwr}%` : 'LED OFF';
+  $('#vLedTxt').classList.toggle('on', !!s.led);
+  $('#rngPwr').value = s.pwr;
+  $('#vPwr').textContent = `${s.pwr}%`;
+  $$('#segGain button').forEach(b => b.classList.toggle('on', +b.dataset.v === s.gain));
+  const cyc = 256 - s.atime;
+  ensureOption($('#selIt'), cyc, `${(cyc * 2.4).toFixed(1)} ms`);
+  setSwitch($('#swAgc'), !!s.agc);
+  $$('.auto-tag').forEach(t => t.hidden = !s.agc);
+  ensureOption($('#selRate'), s.rate, rateLabel(s.rate));
+  $('#btnRun').textContent = s.stream ? '■ Stop' : '▶ Run';
+  $('#btnRun').classList.toggle('active', !s.stream);
+  $('#selPix').value = s.pix === 1 ? 'auto' : s.pix === 2 ? 'sync' : 'off';
+  updateStatus();
+  for (const w of [...stateWaiters]) if (w.pred(s)) { clearTimeout(w.timer); stateWaiters.delete(w); w.resolve(); }
+}
+
+/* ================================ processing ================================ */
+function onSample(s) {
+  s.cycles = 256 - s.atime;
+  s.it = s.cycles * 2.4;
+  s.scale = s.gain * s.it;
+  s.norm = { r: s.r / s.scale, g: s.g / s.scale, b: s.b / s.scale, c: s.c / s.scale };
+  s.sat = Math.max(s.r, s.g, s.b, s.c) >= satLevel(s.cycles) * 0.995;
+
+  rxTimes.push(s.t);
+  if (rxTimes.length > 20) rxTimes.shift();
+  flashLamp();
+
+  win.push(s);
+  if (win.length > 64) win.shift();
+
+  const sig = {}, A = blank ? {} : null;
+  for (const ch of CH) { sig[ch] = sigOf(s.norm, ch); if (A) A[ch] = absOf(s.norm, ch); }
+  series.push({ t: s.t, raw: { r: s.r, g: s.g, b: s.b, c: s.c }, sig, A });
+  if (series.length > 6000) series.splice(0, series.length - 6000);
+
+  feedCaptures(s);
+  const m = derive(averaged());
+  if (recording) addLogRow(m, $('#inpLabel').value.trim());
+  if (!hold) {
+    cur = m;
+    if (fin(m.xy[0])) { cieTrail.push(m.xy); if (cieTrail.length > 80) cieTrail.shift(); }
+  }
+  syncPix(m);
+  requestRender();
+}
+
+function averaged() {
+  const last = win[win.length - 1], same = [];
+  for (let i = win.length - 1; i >= 0 && same.length < Math.max(prefs.avgN, 10); i--) {
+    const s = win[i];
+    if (s.atime !== last.atime || s.gain !== last.gain) break;   // settings changed: start a new average
+    same.push(s);
+  }
+  const take = same.slice(0, prefs.avgN);
+  const a = { atime: last.atime, gain: last.gain, cycles: last.cycles, it: last.it, scale: last.scale, N: take.length, n: take.reduce((t, s) => t + s.n, 0), sd: {}, sdN: same.length };
+  for (const ch of CH) {
+    a[ch] = mean(take.map(s => s[ch]));
+    a.sd[ch] = same.length > 2 ? stdev(same.map(s => s[ch])) : NaN;
+  }
+  return a;
+}
+
+const sigOf = (norm, ch) => Math.max(0, norm[ch] - (cal.dark ? cal.dark[ch] : 0));
+function absOf(norm, ch) {
+  if (!blank) return NaN;
+  const i0 = sigOf(blank, ch), i = sigOf(norm, ch);
+  return i0 > 0 && i > 0 ? -Math.log10(i / i0) : NaN;
+}
+
+function derive(a) {
+  const satLvl = satLevel(a.cycles);
+  const norm = {}, sig = {};
+  for (const ch of CH) { norm[ch] = a[ch] / a.scale; sig[ch] = sigOf(norm, ch); }
+  const sat = Math.max(a.r, a.g, a.b, a.c) >= satLvl * 0.995;
+
+  // Object colour: white-balanced reflectance if calibrated, otherwise hue only (max-normalised)
+  let lin, wb = false;
+  const w = cal.white ? { r: sigOf(cal.white, 'r'), g: sigOf(cal.white, 'g'), b: sigOf(cal.white, 'b') } : null;
+  if (w && w.r > 0 && w.g > 0 && w.b > 0) { lin = [sig.r / w.r, sig.g / w.g, sig.b / w.b]; wb = true; }
+  else { const mx = Math.max(sig.r, sig.g, sig.b); lin = mx > 0 ? [sig.r / mx, sig.g / mx, sig.b / mx] : [0, 0, 0]; }
+  const over = Math.max(...lin);
+  if (over > 1) lin = lin.map(v => v / over);
+  const rgb8 = lin.map(v => Math.round(clamp(srgbEnc(clamp(v, 0, 1)), 0, 1) * 255));
+  const hex = '#' + rgb8.map(hex2).join('');
+  const XYZ = mul3(M_RGB2XYZ, lin);
+  const lab = xyzToLab(XYZ);
+  const { hsv, hsl } = hsvHsl(rgb8);
+
+  // Light-source photometry from raw counts (AMS DN40 lux/CCT, DN25 chromaticity)
+  const ir = Math.max(0, (a.r + a.g + a.b - a.c) / 2);
+  const r2 = a.r - ir, g2 = a.g - ir, b2 = a.b - ir;
+  const cpl = a.it * a.gain / 310;
+  const lux = Math.max(0, (0.136 * r2 + g2 - 0.444 * b2) / cpl);
+  const cct = r2 > 0 ? 3810 * b2 / r2 + 1391 : NaN;
+  const sxy = toXy(mul3(M_DN25, [a.r, a.g, a.b]));
+  const cct2 = fin(sxy[0]) ? cctMcCamy(sxy[0], sxy[1]) : NaN;
+
+  let A = null, T = null;
+  if (blank) {
+    A = {}; T = {};
+    for (const ch of CH) { const i0 = sigOf(blank, ch); T[ch] = i0 > 0 ? sig[ch] / i0 : NaN; A[ch] = absOf(norm, ch); }
+  }
+  return {
+    raw: a, norm, sig, sat, satLvl, wb, lin, rgb8, hex, lab, hsv, hsl, xy: toXy(XYZ),
+    name: nearestName(lab), ir, lux, cct, sxy, cct2, A, T,
+    dE: ref ? deltaE2000(ref.lab, lab) : NaN,
+  };
+}
+
+/* ---------- averaged captures for calibration / blank / standards ---------- */
+function captureNorm(k = 10) {
+  if (!link) return Promise.reject(new Error('ยังไม่ได้เชื่อมต่ออุปกรณ์'));
+  const per = Math.max(dev.state.rate || 0, (256 - dev.state.atime) * 2.4 + 2.4);
+  return new Promise((resolve, reject) => {
+    const job = { k, skip: 1, acc: [], resolve, reject };
+    job.timer = setTimeout(() => {
+      pending.splice(pending.indexOf(job), 1);
+      reject(new Error('ไม่ได้รับข้อมูลจากเซนเซอร์ (timeout)'));
+    }, (k + 2) * per * 2 + 5000);
+    pending.push(job);
+    if (!dev.state.stream) send('READ', true);
+  });
+}
+function feedCaptures(s) {
+  if (!pending.length) return;
+  for (const job of pending.slice()) {
+    if (job.skip > 0) job.skip--;           // first sample may straddle a settings change
+    else job.acc.push(s);
+    if (job.acc.length >= job.k) {
+      clearTimeout(job.timer);
+      pending.splice(pending.indexOf(job), 1);
+      const norm = {};
+      for (const ch of CH) norm[ch] = mean(job.acc.map(x => x.norm[ch]));
+      job.resolve({ norm, sat: job.acc.some(x => x.sat), n: job.acc.length });
+    }
+  }
+  if (pending.length && !dev.state.stream) send('READ', true);
+}
+async function withLed(on, fn) {
+  const prev = !!dev.state.led;
+  if (prev !== on) { const w = waitState(s => !!s.led === on); await send(`LED ${on ? 1 : 0}`); await w; }
+  try { return await fn(); }
+  finally { if (prev !== on && link) send(`LED ${prev ? 1 : 0}`); }
+}
+async function runCapture(btn, fn) {
+  if (btn.classList.contains('busy')) return;
+  const html = btn.innerHTML;
+  btn.classList.add('busy');
+  btn.textContent = 'Measuring…';
+  try { await fn(); }
+  catch (e) { toast(e.message, 'bad'); }
+  finally { btn.classList.remove('busy'); btn.innerHTML = html; }
+}
+function rejectSaturated(r) {
+  if (r.sat) throw new Error('สัญญาณอิ่มตัว (saturated) — ลด Gain / Integration time หรือความสว่าง LED แล้วลองใหม่');
+  return r;
+}
+
+/* ---------- board RGB LED mirroring ---------- */
+let pixLast = '', pixAt = 0;
+function syncPix(m) {
+  if (!link || $('#selPix').value !== 'sync') return;
+  const now = performance.now();
+  if (now - pixAt < 250 || m.hex === pixLast) return;
+  pixAt = now; pixLast = m.hex;
+  send(`PIX ${m.rgb8.join(' ')}`, true);
+}
+
+/* ---------- data log ---------- */
+function addLogRow(m, label) {
+  if (!m) return;
+  const row = { i: ++logSeq, ts: new Date(), label: label || '', m };
+  logRows.push(row);
+  if (logRows.length > 50000) logRows.shift();
+  const a = m.raw, tr = document.createElement('tr');
+  tr.innerHTML = `<td>${row.i}</td><td class="l">${row.ts.toLocaleTimeString('en-GB')}</td><td class="l lab"></td>`
+    + `<td class="l"><span class="dot" style="background:${m.hex}"></span>${m.hex}</td>`
+    + `<td>${fInt(a.r)}</td><td>${fInt(a.g)}</td><td>${fInt(a.b)}</td><td>${fInt(a.c)}</td><td>${a.gain}×</td><td>${f(a.it, 1)}</td>`
+    + `<td>${f(m.lab[0], 1)}</td><td>${f(m.lab[1], 1)}</td><td>${f(m.lab[2], 1)}</td><td>${f(m.lux, 1)}</td><td>${f(m.cct, 0)}</td>`
+    + `<td>${m.A ? f(m.A.r, 3) : '—'}</td><td>${m.A ? f(m.A.g, 3) : '—'}</td><td>${m.A ? f(m.A.b, 3) : '—'}</td><td>${f(m.dE, 2)}</td>`;
+  tr.querySelector('.lab').textContent = row.label;
+  const body = $('#logBody');
+  body.insertBefore(tr, body.firstChild);
+  while (body.rows.length > 300) body.deleteRow(-1);
+  $('#logCount').textContent = logRows.length;
+}
+
+function exportCsv() {
+  if (!logRows.length) { toast('ยังไม่มีข้อมูลใน Data log', 'warn'); return; }
+  const head = ['index', 'timestamp', 'label', 'R_raw', 'G_raw', 'B_raw', 'C_raw', 'gain', 'integration_ms', 'n_cycles',
+    'R_sig', 'G_sig', 'B_sig', 'C_sig', 'sR', 'sG', 'sB', 'hex', 'L', 'a', 'b', 'x', 'y', 'lux', 'cct_K', 'cct_mccamy_K',
+    'T_R', 'T_G', 'T_B', 'T_C', 'A_R', 'A_G', 'A_B', 'A_C', 'dE00_ref', 'white_balanced', 'saturated'];
+  const num = (v, d) => fin(v) ? v.toFixed(d) : '';
+  const esc = v => { const s = String(v); return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const lines = [head.join(',')];
+  for (const { i, ts, label, m } of logRows) {
+    const a = m.raw;
+    lines.push([i, ts.toISOString(), label, num(a.r, 1), num(a.g, 1), num(a.b, 1), num(a.c, 1), a.gain, num(a.it, 1), a.n,
+      ...CH.map(ch => num(m.sig[ch], 4)), ...m.rgb8, m.hex, num(m.lab[0], 2), num(m.lab[1], 2), num(m.lab[2], 2),
+      num(m.xy[0], 4), num(m.xy[1], 4), num(m.lux, 2), num(m.cct, 0), num(m.cct2, 0),
+      ...CH.map(ch => m.T ? num(m.T[ch], 4) : ''), ...CH.map(ch => m.A ? num(m.A[ch], 4) : ''),
+      num(m.dE, 3), m.wb ? 1 : 0, m.sat ? 1 : 0].map(esc).join(','));
+  }
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  const d = new Date(), p2 = v => String(v).padStart(2, '0');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `rgb-log-${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/* ---------- console ---------- */
+function conLog(kind, text, isData = false) {
+  if (isData && !prefs.conData) return;
+  const con = $('#con');
+  const atEnd = con.scrollTop + con.clientHeight >= con.scrollHeight - 8;
+  const el = document.createElement('div');
+  el.className = kind;
+  const t = new Date().toLocaleTimeString('en-GB');
+  el.textContent = `${t} ${kind === 'tx' ? '>' : kind === 'rx' ? '<' : '·'} ${text}`;
+  con.appendChild(el);
+  while (con.childNodes.length > 500) con.removeChild(con.firstChild);
+  if (atEnd) con.scrollTop = con.scrollHeight;
+}
+
+/* ================================ rendering ================================ */
+let renderQueued = false;
+function requestRender() { if (!renderQueued) { renderQueued = true; requestAnimationFrame(render); } }
+function render() {
+  renderQueued = false;
+  renderReadouts();
+  if (activeTab === 'chart') drawChart();
+  else if (activeTab === 'cie') drawCie();
+  else if (activeTab === 'abs') renderAbs();
+}
+
+const meterEls = {};
+function buildMeters() {
+  const box = $('#meters');
+  for (const ch of CH) {
+    const row = document.createElement('div');
+    row.className = 'meter';
+    row.style.setProperty('--chc', `var(--ch-${ch})`);
+    row.innerHTML = `<div class="m-name">${CH_NAME[ch]}</div><div class="m-bar"><div class="m-fill"></div><div class="m-sat" title="90% of saturation"></div></div>`
+      + `<div class="m-raw">—</div><div class="m-foot"><span><b class="pct">—</b> % sat</span><span>σ <b class="sd">—</b></span><span>CV <b class="cv">—</b> %</span><span>signal <b class="sig">—</b></span></div>`;
+    box.appendChild(row);
+    meterEls[ch] = { row, fill: $('.m-fill', row), raw: $('.m-raw', row), pct: $('.pct', row), sd: $('.sd', row), cv: $('.cv', row), sig: $('.sig', row) };
+  }
+}
+
+const DE_SCALE = [[1, 'แยกด้วยตาไม่ได้', 'ok'], [2, 'ต่างเล็กน้อย ต้องสังเกตใกล้ ๆ', 'ok'], [10, 'เห็นความต่างได้ทันที', 'warn'], [50, 'สีต่างกันชัดเจน', 'bad'], [Infinity, 'คนละสี', 'bad']];
+
+function renderReadouts() {
+  const m = cur;
+  lamp('lampSat', m && m.sat ? 'bad' : '');
+  if (!m) return;
+  const a = m.raw;
+  $('#swatch').style.backgroundColor = m.hex;
+  $('#satFlag').hidden = !m.sat;
+  $('#vHex').textContent = m.hex.toUpperCase();
+  const nm = $('#vName');
+  nm.innerHTML = '';
+  const b = document.createElement('b');
+  b.textContent = `${m.name.en} · ${m.name.th}`;
+  nm.append('ใกล้เคียง ', b, ` (ΔE ${m.name.de.toFixed(1)})`);
+  $('#vRgb').textContent = m.rgb8.join(', ');
+  $('#vHsv').textContent = `${f(m.hsv[0])}°, ${f(m.hsv[1])}%, ${f(m.hsv[2])}%`;
+  $('#vHsl').textContent = `${f(m.hsl[0])}°, ${f(m.hsl[1])}%, ${f(m.hsl[2])}%`;
+  $('#vLab').textContent = `${f(m.lab[0], 1)}, ${f(m.lab[1], 1)}, ${f(m.lab[2], 1)}`;
+  $('#vXy').textContent = `${f(m.xy[0], 4)}, ${f(m.xy[1], 4)}`;
+  const tag = $('#wbTag');
+  tag.textContent = m.wb ? 'WB CAL' : 'WB UNCAL';
+  tag.className = `tag ${m.wb ? 'ok' : 'warn'}`;
+  tag.title = m.wb ? 'White balance calibrated' : 'ยังไม่ได้ Calibrate WHITE — สีที่แสดงเป็นเฉดสี (hue) เท่านั้น ไม่มีข้อมูลความสว่าง';
+
+  if (ref) {
+    const [, txt, cls] = DE_SCALE.find(([lim]) => m.dE < lim) || DE_SCALE[DE_SCALE.length - 1];
+    $('#vDe').textContent = f(m.dE, 2);
+    $('#vDe').style.color = `var(--${cls})`;
+    $('#vDeTxt').textContent = txt;
+  }
+
+  for (const ch of CH) {
+    const e = meterEls[ch], v = a[ch], pct = v / m.satLvl * 100;
+    e.fill.style.width = `${clamp(pct, 0, 100)}%`;
+    e.raw.textContent = fInt(v);
+    e.pct.textContent = f(pct, 1);
+    e.sd.textContent = fin(a.sd[ch]) ? `±${fSig(a.sd[ch])}` : '—';
+    e.cv.textContent = fin(a.sd[ch]) && v > 0 ? f(a.sd[ch] / v * 100, 2) : '—';
+    e.sig.textContent = fSig(m.sig[ch]);
+    e.row.classList.toggle('sat', v >= m.satLvl * 0.995);
+  }
+  $('#vFs').textContent = `${a.gain}× · ${a.it.toFixed(1)} ms · sat ${m.satLvl.toLocaleString('en-US')} · avg ${a.N}×${Math.round(a.n / Math.max(1, a.N))}`;
+  $('#vLux').textContent = m.sat ? 'SAT' : m.lux >= 1000 ? f(m.lux, 0) : m.lux >= 10 ? f(m.lux, 1) : f(m.lux, 2);
+  $('#vCct').textContent = fin(m.cct) && m.cct > 0 && m.cct < 50000 ? f(m.cct, 0) : '—';
+  $('#vCct2').textContent = fin(m.cct2) && m.cct2 > 0 && m.cct2 < 50000 ? f(m.cct2, 0) : '—';
+  $('#vIr').textContent = fInt(m.ir);
+  $('#vSxy').textContent = `${f(m.sxy[0], 4)}, ${f(m.sxy[1], 4)}`;
+}
+
+function fitCanvas(cv) {
+  const r = cv.getBoundingClientRect();
+  if (r.width < 10 || r.height < 10) return null;
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.round(r.width * dpr), h = Math.round(r.height * dpr);
+  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+  const ctx = cv.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, r.width, r.height);
+  return { ctx, w: r.width, h: r.height };
+}
+function seg(ctx, x1, y1, x2, y2) { ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); }
+
+/* ---------- time series ---------- */
+const MODE_LABEL = { raw: 'RAW COUNTS', sig: 'SIGNAL · counts / (gain·ms), dark-subtracted', abs: 'ABSORBANCE · −log₁₀(I/I₀)' };
+function drawChart() {
+  const g = fitCanvas($('#chart'));
+  if (!g) return;
+  const { ctx, w, h } = g, P = { l: 58, r: 14, t: 28, b: 26 }, pw = w - P.l - P.r, ph = h - P.t - P.b;
+  const now = performance.now(), span = prefs.span * 1000, mode = prefs.mode;
+  const chans = CH.filter(c => prefs.chans[c]);
+  const pick = mode === 'raw' ? p => p.raw : mode === 'sig' ? p => p.sig : p => p.A;
+  let i0 = series.length;
+  while (i0 > 0 && now - series[i0 - 1].t <= span) i0--;
+  const pts = series.slice(i0);
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) { const o = pick(p); if (o) for (const c of chans) { const v = o[c]; if (fin(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } } }
+  const empty = !fin(lo);
+  if (empty) { lo = 0; hi = mode === 'raw' ? 65535 : 1; }
+  if (mode !== 'abs') lo = Math.min(lo, 0);
+  if (hi - lo < 1e-6) { hi += 0.5; lo -= mode === 'abs' ? 0.5 : 0; }
+  const padv = (hi - lo) * 0.06;
+  const T = niceTicks(mode === 'abs' ? lo - padv : lo, hi + padv, 5);
+  const X = t => P.l + pw * (1 - (now - t) / span);
+  const Y = v => P.t + ph * (1 - (v - T.lo) / (T.hi - T.lo));
+
+  ctx.lineWidth = 1;
+  ctx.font = `10px ${FONT_MONO}`;
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'right';
+  for (const v of T.ticks) {
+    const y = Math.round(Y(v)) + 0.5;
+    ctx.strokeStyle = v === 0 ? COL.axis : COL.grid;
+    seg(ctx, P.l, y, P.l + pw, y);
+    ctx.fillStyle = COL.faint;
+    ctx.fillText(fmtTick(v, T.step), P.l - 8, y);
+  }
+  const xs = prefs.span / 6;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let k = 0; k <= 6; k++) {
+    const x = Math.round(X(now - k * xs * 1000)) + 0.5;
+    ctx.strokeStyle = COL.grid;
+    seg(ctx, x, P.t, x, P.t + ph);
+    ctx.fillStyle = COL.faint;
+    ctx.fillText(k ? `−${k * xs} s` : 'now', clamp(x, P.l + 14, P.l + pw - 14), P.t + ph + 8);
+  }
+  ctx.strokeStyle = COL.axis;
+  ctx.strokeRect(P.l + 0.5, P.t + 0.5, pw - 1, ph - 1);
+
+  ctx.save();
+  ctx.beginPath(); ctx.rect(P.l, P.t, pw, ph); ctx.clip();
+  ctx.lineWidth = 1.6; ctx.lineJoin = 'round';
+  for (const c of chans) {
+    ctx.strokeStyle = COL[c];
+    ctx.beginPath();
+    let pen = false;
+    for (const p of pts) {
+      const o = pick(p), v = o ? o[c] : NaN;
+      if (!fin(v)) { pen = false; continue; }
+      const x = X(p.t), y = Y(v);
+      if (pen) ctx.lineTo(x, y); else ctx.moveTo(x, y);
+      pen = true;
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.font = `10.5px ${FONT_MONO}`;
+  ctx.fillStyle = COL.dim;
+  ctx.fillText(MODE_LABEL[mode], P.l, 13);
+  const last = pts[pts.length - 1], lo2 = last && pick(last);
+  let x = P.l + pw;
+  ctx.textAlign = 'right'; ctx.font = `500 11.5px ${FONT_MONO}`;
+  for (const c of [...chans].reverse()) {
+    const v = lo2 ? lo2[c] : NaN;
+    const s = `${CH_NAME[c]} ${mode === 'raw' ? fInt(v) : mode === 'abs' ? f(v, 3) : fSig(v)}`;
+    if (x - ctx.measureText(s).width < P.l + ctx.measureText(MODE_LABEL[mode]).width + 20) break;
+    ctx.fillStyle = COL[c];
+    ctx.fillText(s, x, 13);
+    x -= ctx.measureText(s).width + 16;
+  }
+  if (empty) {
+    ctx.textAlign = 'center'; ctx.fillStyle = COL.faint; ctx.font = `12px ${FONT_MONO}`;
+    ctx.fillText(mode === 'abs' && !blank ? 'SET BLANK (I₀) IN THE ABSORBANCE TAB' : 'NO DATA', P.l + pw / 2, P.t + ph / 2);
+  }
+}
+
+/* ---------- CIE 1931 chromaticity diagram ---------- */
+const LOCUS = [[380,.1741,.0050],[385,.1740,.0050],[390,.1738,.0049],[395,.1736,.0049],[400,.1733,.0048],[405,.1730,.0048],[410,.1726,.0048],
+  [415,.1721,.0048],[420,.1714,.0051],[425,.1703,.0058],[430,.1689,.0069],[435,.1669,.0086],[440,.1644,.0109],[445,.1611,.0138],[450,.1566,.0177],
+  [455,.1510,.0227],[460,.1440,.0297],[465,.1355,.0399],[470,.1241,.0578],[475,.1096,.0868],[480,.0913,.1327],[485,.0687,.2007],[490,.0454,.2950],
+  [495,.0235,.4127],[500,.0082,.5384],[505,.0039,.6548],[510,.0139,.7502],[515,.0389,.8120],[520,.0743,.8338],[525,.1142,.8262],[530,.1547,.8059],
+  [535,.1929,.7816],[540,.2296,.7543],[545,.2658,.7243],[550,.3016,.6923],[555,.3373,.6589],[560,.3731,.6245],[565,.4087,.5896],[570,.4441,.5547],
+  [575,.4788,.5202],[580,.5125,.4866],[585,.5448,.4544],[590,.5752,.4242],[595,.6029,.3965],[600,.6270,.3725],[605,.6482,.3514],[610,.6658,.3340],
+  [615,.6801,.3197],[620,.6915,.3083],[625,.7006,.2993],[630,.7079,.2920],[635,.7140,.2859],[640,.7190,.2809],[645,.7230,.2770],[650,.7260,.2740],
+  [655,.7283,.2717],[660,.7300,.2700],[665,.7311,.2689],[670,.7320,.2680],[675,.7327,.2673],[680,.7334,.2666],[685,.7340,.2660],[690,.7344,.2656],
+  [695,.7346,.2654],[700,.7347,.2653]];
+const LOCUS_LABELS = new Set([460, 470, 480, 490, 500, 510, 520, 530, 540, 550, 560, 570, 580, 590, 600, 620, 700]);
+let cieBg = null;
+function buildCieBg() {
+  const W = 400, H = 450, poly = LOCUS.map(([, x, y]) => [x, y]);
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(W, H);
+  const inside = (x, y) => {
+    let c = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i], [xj, yj] = poly[j];
+      if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+    }
+    return c;
+  };
+  for (let py = 0; py < H; py++) {
+    const y = (1 - (py + 0.5) / H) * 0.9;
+    if (y < 0.004 || y > 0.835) continue;
+    for (let px = 0; px < W; px++) {
+      const x = (px + 0.5) / W * 0.8;
+      if (x > 0.736 || !inside(x, y)) continue;
+      let rgb = mul3(M_XYZ2RGB, [x / y, 1, (1 - x - y) / y]).map(v => Math.max(0, v));
+      const mx = Math.max(...rgb);
+      rgb = rgb.map(v => srgbEnc(v / mx) * 0.92);
+      const i = (py * W + px) * 4;
+      img.data[i] = rgb[0] * 255; img.data[i + 1] = rgb[1] * 255; img.data[i + 2] = rgb[2] * 255; img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv;
+}
+function drawCie() {
+  const g = fitCanvas($('#cie'));
+  if (!g) return;
+  const { ctx, w, h } = g, P = { l: 44, r: 16, t: 16, b: 34 };
+  const sc = Math.min((w - P.l - P.r) / 0.8, (h - P.t - P.b) / 0.9);
+  const ox = P.l + ((w - P.l - P.r) - 0.8 * sc) / 2, oy = P.t + 0.9 * sc;
+  const X = x => ox + x * sc, Y = y => oy - y * sc;
+
+  ctx.lineWidth = 1; ctx.font = `10px ${FONT_MONO}`; ctx.fillStyle = COL.faint;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (let i = 0; i <= 8; i++) { const x = Math.round(X(i / 10)) + 0.5; ctx.strokeStyle = COL.grid; seg(ctx, x, Y(0.9), x, Y(0)); ctx.fillText((i / 10).toFixed(1), x, Y(0) + 6); }
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (let i = 0; i <= 9; i++) { const y = Math.round(Y(i / 10)) + 0.5; ctx.strokeStyle = COL.grid; seg(ctx, X(0), y, X(0.8), y); ctx.fillText((i / 10).toFixed(1), X(0) - 6, y); }
+  ctx.fillStyle = COL.dim; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+  ctx.fillText('x', X(0.4), h - 4);
+  ctx.save(); ctx.translate(X(0) - 32, Y(0.45)); ctx.rotate(-Math.PI / 2); ctx.fillText('y', 0, 0); ctx.restore();
+
+  if (!cieBg) cieBg = buildCieBg();
+  const locusPath = () => { ctx.beginPath(); LOCUS.forEach(([, x, y], i) => i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.closePath(); };
+  ctx.save(); locusPath(); ctx.clip(); ctx.globalAlpha = 0.8; ctx.drawImage(cieBg, X(0), Y(0.9), 0.8 * sc, 0.9 * sc); ctx.restore();
+  locusPath(); ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.stroke();
+
+  ctx.font = `9.5px ${FONT_MONO}`; ctx.fillStyle = COL.dim; ctx.strokeStyle = 'rgba(255,255,255,.45)';
+  for (const [nm, x, y] of LOCUS) {
+    if (!LOCUS_LABELS.has(nm)) continue;
+    const dx = x - 0.3127, dy = y - 0.3290, d = Math.hypot(dx, dy), ux = dx / d, uy = -dy / d;
+    const px = X(x), py = Y(y);
+    seg(ctx, px, py, px + ux * 5, py + uy * 5);
+    ctx.textAlign = ux > 0.3 ? 'left' : ux < -0.3 ? 'right' : 'center';
+    ctx.textBaseline = uy > 0.3 ? 'top' : uy < -0.3 ? 'bottom' : 'middle';
+    ctx.fillText(nm, px + ux * 8, py + uy * 8);
+  }
+
+  ctx.setLineDash([3, 3]); ctx.strokeStyle = 'rgba(255,255,255,.7)';
+  ctx.beginPath(); [[0.64, 0.33], [0.30, 0.60], [0.15, 0.06]].forEach(([x, y], i) => i ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y))); ctx.closePath(); ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = 'rgba(20,24,28,.9)'; ctx.lineWidth = 3;
+  const planck = () => { ctx.beginPath(); for (let T = 1667; T <= 25000; T *= 1.03) { const [x, y] = planckXY(T); T === 1667 ? ctx.moveTo(X(x), Y(y)) : ctx.lineTo(X(x), Y(y)); } };
+  planck(); ctx.stroke();
+  ctx.strokeStyle = COL.c; ctx.lineWidth = 1.2; planck(); ctx.stroke();
+  ctx.fillStyle = '#111'; ctx.font = `9px ${FONT_MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const T of [2000, 3000, 4000, 6500, 10000]) {
+    const [x, y] = planckXY(T);
+    ctx.beginPath(); ctx.arc(X(x), Y(y), 2.2, 0, Math.PI * 2); ctx.fillStyle = COL.c; ctx.fill();
+    ctx.fillStyle = 'rgba(10,12,14,.85)'; ctx.fillText(T >= 1000 ? `${T / 1000}k` : T, X(x), Y(y) + 5);
+  }
+  const [wx, wy] = [0.3127, 0.3290];
+  ctx.strokeStyle = '#111'; ctx.lineWidth = 1;
+  seg(ctx, X(wx) - 4, Y(wy), X(wx) + 4, Y(wy)); seg(ctx, X(wx), Y(wy) - 4, X(wx), Y(wy) + 4);
+
+  if (ref && ref.xy && fin(ref.xy[0])) {
+    ctx.strokeStyle = COL.b; ctx.lineWidth = 2;
+    ctx.strokeRect(X(ref.xy[0]) - 5, Y(ref.xy[1]) - 5, 10, 10);
+  }
+  ctx.fillStyle = '#fff';
+  cieTrail.forEach(([x, y], i) => { ctx.globalAlpha = (i + 1) / cieTrail.length * 0.5; ctx.beginPath(); ctx.arc(X(x), Y(y), 1.6, 0, Math.PI * 2); ctx.fill(); });
+  ctx.globalAlpha = 1;
+  const m = cur;
+  if (m && fin(m.sxy[0]) && m.sxy[0] > 0 && m.sxy[0] < 0.8 && m.sxy[1] > 0 && m.sxy[1] < 0.9) {
+    const px = X(m.sxy[0]), py = Y(m.sxy[1]);
+    ctx.strokeStyle = '#000'; ctx.lineWidth = 4;
+    ctx.beginPath(); ctx.moveTo(px, py - 7); ctx.lineTo(px + 7, py); ctx.lineTo(px, py + 7); ctx.lineTo(px - 7, py); ctx.closePath(); ctx.stroke();
+    ctx.strokeStyle = COL.accent; ctx.lineWidth = 2; ctx.stroke();
+  }
+  if (m && fin(m.xy[0])) {
+    const px = X(m.xy[0]), py = Y(m.xy[1]);
+    ctx.lineWidth = 4; ctx.strokeStyle = '#000';
+    ctx.beginPath(); ctx.arc(px, py, 6, 0, Math.PI * 2); ctx.stroke();
+    ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.lineWidth = 1;
+    seg(ctx, px - 13, py, px - 8, py); seg(ctx, px + 8, py, px + 13, py); seg(ctx, px, py - 13, px, py - 8); seg(ctx, px, py + 8, px, py + 13);
+  }
+  $('#cieSample').textContent = m ? `x ${f(m.xy[0], 4)} · y ${f(m.xy[1], 4)}` : '—';
+  $('#cieSource').textContent = m ? `x ${f(m.sxy[0], 4)} · y ${f(m.sxy[1], 4)}${fin(m.cct2) && m.cct2 > 0 && m.cct2 < 50000 ? ` · ${f(m.cct2, 0)} K` : ''}` : '—';
+  $('#cieRef').textContent = ref ? `x ${f(ref.xy[0], 4)} · y ${f(ref.xy[1], 4)} · ${ref.hex}` : 'not set';
+}
+
+/* ---------- absorbance & standard curve ---------- */
+const stdPoints = () => std.pts.map(p => [p.conc, absOf(p.norm, std.ch)]).filter(([x, y]) => fin(x) && fin(y));
+const currentA = () => cur && blank ? absOf(cur.norm, std.ch) : NaN;
+function renderAbs() {
+  let best = null, bestA = -Infinity;
+  if (cur && cur.A) for (const ch of CH.slice(0, 3)) if (fin(cur.A[ch]) && cur.A[ch] > bestA) { bestA = cur.A[ch]; best = ch; }
+  $('#absBody').innerHTML = CH.map(ch => {
+    const i0 = blank ? sigOf(blank, ch) : NaN, i = cur ? cur.sig[ch] : NaN, T = i / i0, A = cur && cur.A ? cur.A[ch] : NaN;
+    return `<tr class="${ch === best ? 'best' : ''}"><td class="l" style="color:var(--ch-${ch})">${CH_NAME[ch]}</td><td>${fSig(i0)}</td><td>${fSig(i)}</td><td>${fin(T) ? f(T * 100, 1) : '—'}</td><td>${f(A, 3)}</td></tr>`;
+  }).join('');
+
+  const pts = stdPoints(), fit = linfit(pts, std.zero);
+  if (stdDirty) {
+    stdDirty = false;
+    $('#stdBody').innerHTML = std.pts.map((p, i) => {
+      const A = absOf(p.norm, std.ch), res = fit && fin(A) ? A - (fit.m * p.conc + fit.b) : NaN;
+      return `<tr><td class="l">${i + 1}</td><td>${p.conc}</td><td>${f(A, 4)}</td><td>${fin(res) ? (res >= 0 ? '+' : '') + res.toFixed(4) : '—'}</td><td><button class="x" data-i="${i}" title="ลบ">✕</button></td></tr>`;
+    }).join('') || `<tr><td class="l" colspan="5" style="color:var(--text-faint)">ยังไม่มีสารมาตรฐาน</td></tr>`;
+  }
+  const u = std.unit || '';
+  $('#vFit').innerHTML = fit
+    ? `A = ${fit.m.toPrecision(4)} · c ${fit.b >= 0 ? '+' : '−'} ${Math.abs(fit.b).toPrecision(3)}<br>R² = ${fit.r2.toFixed(4)} · n = ${fit.n} · ช่อง ${CH_NAME[std.ch]}`
+    : (std.zero ? 'ต้องมีสารมาตรฐานอย่างน้อย 1 จุด' : 'ต้องมีสารมาตรฐานอย่างน้อย 2 จุด');
+  const aNow = currentA(), unk = fit && fit.m && fin(aNow) ? (aNow - fit.b) / fit.m : NaN;
+  const xs = pts.map(p => p[0]);
+  const extrap = fin(unk) && xs.length && (unk < Math.min(...xs) || unk > Math.max(...xs));
+  $('#vUnk').textContent = fin(unk) ? `${unk.toPrecision(4)} ${u}${extrap ? '  ⚠ นอกช่วงมาตรฐาน' : ''}` : (blank ? '—' : 'ต้องตั้ง BLANK ก่อน');
+  drawStd(pts, fit, aNow, unk);
+}
+function drawStd(pts, fit, aNow, unk) {
+  const g = fitCanvas($('#stdChart'));
+  if (!g) return;
+  const { ctx, w, h } = g, P = { l: 54, r: 16, t: 16, b: 40 }, pw = w - P.l - P.r, ph = h - P.t - P.b;
+  const xmax = Math.max(0, ...pts.map(p => p[0]), fin(unk) ? unk : 0) || 1;
+  const ys = [0, ...pts.map(p => p[1]), ...(fin(aNow) ? [aNow] : [])];
+  let ymin = Math.min(...ys), ymax = Math.max(...ys);
+  if (ymax - ymin < 0.05) ymax = ymin + 0.1;
+  const TX = niceTicks(0, xmax * 1.08, 5), TY = niceTicks(ymin, ymax + (ymax - ymin) * 0.08, 5);
+  const X = v => P.l + (v - TX.lo) / (TX.hi - TX.lo) * pw, Y = v => P.t + ph * (1 - (v - TY.lo) / (TY.hi - TY.lo));
+
+  ctx.lineWidth = 1; ctx.font = `10px ${FONT_MONO}`; ctx.fillStyle = COL.faint;
+  ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+  for (const v of TY.ticks) { const y = Math.round(Y(v)) + 0.5; ctx.strokeStyle = v === 0 ? COL.axis : COL.grid; seg(ctx, P.l, y, P.l + pw, y); ctx.fillText(fmtTick(v, TY.step), P.l - 8, y); }
+  ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+  for (const v of TX.ticks) { const x = Math.round(X(v)) + 0.5; ctx.strokeStyle = COL.grid; seg(ctx, x, P.t, x, P.t + ph); ctx.fillText(fmtTick(v, TX.step), x, P.t + ph + 6); }
+  ctx.strokeStyle = COL.axis; ctx.strokeRect(P.l + 0.5, P.t + 0.5, pw - 1, ph - 1);
+  ctx.fillStyle = COL.dim; ctx.textBaseline = 'alphabetic';
+  ctx.fillText(`Concentration${std.unit ? ` (${std.unit})` : ''}`, P.l + pw / 2, h - 4);
+  ctx.save(); ctx.translate(12, P.t + ph / 2); ctx.rotate(-Math.PI / 2); ctx.fillText(`Absorbance · ${CH_NAME[std.ch]}`, 0, 0); ctx.restore();
+
+  ctx.save(); ctx.beginPath(); ctx.rect(P.l, P.t, pw, ph); ctx.clip();
+  if (fit) { ctx.strokeStyle = COL.dim; ctx.lineWidth = 1.5; seg(ctx, X(TX.lo), Y(fit.m * TX.lo + fit.b), X(TX.hi), Y(fit.m * TX.hi + fit.b)); }
+  if (fin(unk) && fin(aNow)) {
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = COL.accent; ctx.lineWidth = 1;
+    seg(ctx, P.l, Y(aNow), X(unk), Y(aNow)); seg(ctx, X(unk), Y(aNow), X(unk), P.t + ph);
+    ctx.setLineDash([]);
+    ctx.fillStyle = COL.accent; ctx.beginPath();
+    ctx.moveTo(X(unk), Y(aNow) - 6); ctx.lineTo(X(unk) + 6, Y(aNow)); ctx.lineTo(X(unk), Y(aNow) + 6); ctx.lineTo(X(unk) - 6, Y(aNow)); ctx.closePath(); ctx.fill();
+  }
+  for (const [x, y] of pts) {
+    ctx.beginPath(); ctx.arc(X(x), Y(y), 4.5, 0, Math.PI * 2);
+    ctx.fillStyle = COL[std.ch]; ctx.fill(); ctx.strokeStyle = '#000'; ctx.lineWidth = 1; ctx.stroke();
+  }
+  ctx.restore();
+  if (!pts.length) { ctx.fillStyle = COL.faint; ctx.font = `12px ${FONT_MONO}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(blank ? 'ADD STANDARDS' : 'SET BLANK FIRST', P.l + pw / 2, P.t + ph / 2); }
+}
+
+/* ================================ UI state ================================ */
+function setSwitch(el, on) { el.setAttribute('aria-checked', on ? 'true' : 'false'); }
+function lamp(id, cls) { const el = $('#' + id); el.classList.remove('on', 'warn', 'bad'); if (cls) el.classList.add(cls); }
+let flashT = 0;
+function flashLamp() { lamp('lampData', 'on'); clearTimeout(flashT); flashT = setTimeout(() => lamp('lampData', ''), 90); }
+const rateLabel = v => v === 0 ? 'every cycle' : v >= 1000 ? `${v / 1000} s` : `${v} ms`;
+function ensureOption(sel, value, label) {
+  const v = String(value);
+  if (![...sel.options].some(o => o.value === v)) sel.add(new Option(label, v));
+  sel.value = v;
+}
+
+function setLinkUi(state, t) {
+  const on = state === 'online';
+  lamp('lampLink', on ? 'on' : state === 'connecting' ? 'warn' : '');
+  for (const [id, kind] of [['btnBle', 'ble'], ['btnUsb', 'usb'], ['btnDemo', 'demo']]) $('#' + id).classList.toggle('active', !!t && on && t.kind === kind);
+  $('#btnDisc').hidden = !on;
+  $$('[data-dev]').forEach(el => { el.disabled = !on; });
+  $('#sbLink').textContent = on ? `${t.label} · ${t.name}` : state === 'connecting' ? 'CONNECTING…' : 'OFFLINE';
+  updateStatus();
+}
+
+function updateStatus() {
+  const s = dev.state, i = dev.info, on = !!link;
+  const ids = { '0x44': 'TCS34725', '0x4D': 'TCS34727' };
+  $('#sbBoard').textContent = on && i.board ? `ESP32-${i.board} Super Mini` : '—';
+  $('#sbFw').textContent = on && i.fw ? i.fw : '—';
+  $('#sbSensor').textContent = on && i.id ? `${ids[i.id] || 'unknown'} (${i.id})` : '—';
+  $('#sbGain').textContent = on ? `${s.gain}×${s.agc ? ' AUTO' : ''}` : '—';
+  $('#sbIt').textContent = on ? `${((256 - s.atime) * 2.4).toFixed(1)} ms` : '—';
+  $('#sbStream').textContent = on ? (s.stream ? rateLabel(s.rate) : 'STOPPED') : '—';
+}
+
+function updateCalUi() {
+  const st = (el, v, txt) => { el.textContent = v ? txt : 'not set'; el.classList.toggle('ok', !!v); };
+  st($('#vDark'), cal.dark, cal.dark && `✓ ${new Date(cal.dark.ts).toLocaleString('en-GB')}`);
+  st($('#vWhite'), cal.white, cal.white && `✓ ${new Date(cal.white.ts).toLocaleString('en-GB')}`);
+  st($('#vBlank'), blank, blank && `✓ ${new Date(blank.ts).toLocaleTimeString('en-GB')}`);
+  const parts = [cal.dark && 'DARK', cal.white && 'WHITE', blank && 'BLANK'].filter(Boolean);
+  $('#sbCal').textContent = parts.length ? parts.join(' · ') : 'NONE';
+  $('#sbCal').classList.toggle('warn', !cal.white);
+  stdDirty = true;
+  requestRender();
+}
+
+function updateRefUi() {
+  $('#refChip').hidden = !ref;
+  if (ref) $('#refChip').style.background = ref.hex;
+  else { $('#vDe').textContent = '—'; $('#vDe').style.color = ''; $('#vDeTxt').textContent = 'ยังไม่ได้ตั้งสีอ้างอิง'; }
+}
+
+function setHold(on) {
+  hold = on;
+  lamp('lampHold', on ? 'warn' : '');
+  $('#btnHold').classList.toggle('active', on);
+}
+function setRec(on) {
+  recording = on;
+  lamp('lampRec', on ? 'bad' : '');
+  $('#btnRec').classList.toggle('active', on);
+  $('#btnRec').textContent = on ? '■ Stop rec' : '● Rec';
+}
+function captureRow() {
+  if (!cur) { toast('ยังไม่มีข้อมูล', 'warn'); return; }
+  addLogRow(cur, $('#inpLabel').value.trim());
+  toast(`บันทึกแถว #${logSeq} · ${cur.hex.toUpperCase()}`, 'ok', 1800);
+}
+function setRef() {
+  if (!cur) { toast('ยังไม่มีข้อมูล', 'warn'); return; }
+  ref = { lab: cur.lab, hex: cur.hex, xy: cur.xy, ts: Date.now() };
+  store.set('cm.ref', ref);
+  updateRefUi();
+  cur.dE = 0;
+  requestRender();
+  toast(`ตั้งสีอ้างอิง ${cur.hex.toUpperCase()}`, 'ok', 1800);
+}
+
+/* ================================ wiring up ================================ */
+function init() {
+  buildMeters();
+  $('#selIt').innerHTML = IT_CYCLES.map(c => `<option value="${c}">${(c * 2.4).toFixed(1)} ms</option>`).join('');
+  $('#selRate').innerHTML = RATES.map(v => `<option value="${v}">${rateLabel(v)}</option>`).join('');
+  $('#selAvg').innerHTML = AVGS.map(v => `<option value="${v}">${v === 1 ? 'off' : `${v} samples`}</option>`).join('');
+  $('#selAvg').value = prefs.avgN;
+  $$('#segMode button').forEach(b => b.classList.toggle('on', b.dataset.v === prefs.mode));
+  $$('#segSpan button').forEach(b => b.classList.toggle('on', +b.dataset.v === prefs.span));
+  $$('.chip input').forEach(i => { i.checked = !!prefs.chans[i.dataset.ch]; });
+  $('#chkConData').checked = prefs.conData;
+  $('#selStdCh').value = std.ch;
+  $('#inpUnit').value = std.unit;
+  $('#chkZero').checked = std.zero;
+  if (!('serial' in navigator)) $('#btnUsb').title = 'เบราว์เซอร์นี้ไม่รองรับ Web Serial';
+  if (!navigator.bluetooth) $('#btnBle').title = 'เบราว์เซอร์นี้ไม่รองรับ Web Bluetooth';
+
+  // connection
+  $('#btnBle').onclick = () => connectWith(BleTransport);
+  $('#btnUsb').onclick = () => connectWith(SerialTransport);
+  $('#btnDemo').onclick = () => connectWith(DemoTransport);
+  $('#btnDisc').onclick = () => link && link.disconnect();
+
+  // controls
+  $('#swLed').onclick = () => send(`LED ${dev.state.led ? 0 : 1}`);
+  $('#rngPwr').oninput = e => { $('#vPwr').textContent = `${e.target.value}%`; };
+  $('#rngPwr').onchange = e => send(`PWR ${e.target.value}`);
+  $('#segGain').onclick = e => { const b = e.target.closest('button'); if (b) send(`GAIN ${b.dataset.v}`); };
+  $('#selIt').onchange = e => send(`ATIME ${256 - +e.target.value}`);
+  $('#swAgc').onclick = () => send(`AGC ${dev.state.agc ? 0 : 1}`);
+  $('#selRate').onchange = e => send(`RATE ${e.target.value}`);
+  $('#selAvg').onchange = e => { prefs.avgN = +e.target.value; savePrefs(); };
+  $('#btnRun').onclick = () => send(`STREAM ${dev.state.stream ? 0 : 1}`);
+  $('#btnRead').onclick = () => send('READ');
+  $('#btnHold').onclick = () => setHold(!hold);
+  $('#selPix').onchange = e => {
+    const v = e.target.value;
+    if (v === 'off') send('PIX OFF');
+    else if (v === 'auto') send('PIX AUTO');
+    else { pixLast = ''; if (cur) syncPix(cur); else send('PIX 0 0 0'); }
+  };
+  $('#btnSave').onclick = () => send('SAVE').then(ok => ok && toast('บันทึกค่าตั้งลงบอร์ดแล้ว', 'ok'));
+  $('#btnInfo').onclick = () => send('INFO');
+
+  // calibration
+  $('#btnDark').onclick = e => runCapture(e.currentTarget, async () => {
+    const r = await withLed(false, () => captureNorm(10));
+    cal.dark = { ...r.norm, ts: Date.now() };
+    saveCal();
+    toast('บันทึก DARK แล้ว', 'ok');
+  });
+  $('#btnWhite').onclick = e => runCapture(e.currentTarget, async () => {
+    const r = rejectSaturated(await captureNorm(10));
+    if (['r', 'g', 'b'].some(ch => sigOf(r.norm, ch) <= 0)) throw new Error('สัญญาณต่ำเกินไป — เปิด LED และวางแผ่นขาวให้ใกล้เซนเซอร์');
+    cal.white = { ...r.norm, ts: Date.now() };
+    saveCal();
+    toast('บันทึก WHITE แล้ว — สีที่แสดงเป็นค่าที่ปรับสมดุลแล้ว', 'ok');
+  });
+  $('#btnCalClr').onclick = () => { cal.dark = null; cal.white = null; saveCal(); toast('ล้างค่า calibration แล้ว'); };
+
+  // reference
+  $('#btnRef').onclick = setRef;
+  $('#btnRefClr').onclick = () => { ref = null; store.set('cm.ref', null); updateRefUi(); requestRender(); };
+  $('#btnCopy').onclick = async () => {
+    if (!cur) return;
+    try { await navigator.clipboard.writeText(cur.hex.toUpperCase()); toast(`คัดลอก ${cur.hex.toUpperCase()}`, 'ok', 1500); }
+    catch (_) { toast('คัดลอกไม่สำเร็จ', 'bad'); }
+  };
+
+  // tabs
+  $$('.tab').forEach(t => t.onclick = () => {
+    activeTab = t.dataset.tab;
+    $$('.tab').forEach(x => x.classList.toggle('active', x === t));
+    $$('.tabpane').forEach(p => p.classList.toggle('active', p.id === `tab-${activeTab}`));
+    stdDirty = true;
+    requestRender();
+  });
+
+  // chart
+  $('#segMode').onclick = e => { const b = e.target.closest('button'); if (!b) return; prefs.mode = b.dataset.v; savePrefs(); $$('#segMode button').forEach(x => x.classList.toggle('on', x === b)); requestRender(); };
+  $('#segSpan').onclick = e => { const b = e.target.closest('button'); if (!b) return; prefs.span = +b.dataset.v; savePrefs(); $$('#segSpan button').forEach(x => x.classList.toggle('on', x === b)); requestRender(); };
+  $$('.chip input').forEach(i => i.onchange = () => { prefs.chans[i.dataset.ch] = i.checked; savePrefs(); requestRender(); });
+  $('#btnChartClr').onclick = () => { series.length = 0; requestRender(); };
+  $('#btnTrailClr').onclick = () => { cieTrail.length = 0; requestRender(); };
+
+  // absorbance
+  $('#btnBlank').onclick = e => runCapture(e.currentTarget, async () => {
+    const r = rejectSaturated(await captureNorm(10));
+    blank = { ...r.norm, ts: Date.now() };
+    saveCal();
+    toast('บันทึก BLANK (I₀) แล้ว', 'ok');
+  });
+  $('#btnBlankClr').onclick = () => { blank = null; saveCal(); };
+  $('#selStdCh').onchange = e => { std.ch = e.target.value; saveStd(); };
+  $('#inpUnit').onchange = e => { std.unit = e.target.value.trim(); saveStd(); };
+  $('#chkZero').onchange = e => { std.zero = e.target.checked; saveStd(); };
+  $('#btnAddStd').onclick = e => {
+    const conc = parseFloat($('#inpConc').value);
+    if (!fin(conc) || conc < 0) { toast('กรอกความเข้มข้นของสารมาตรฐานก่อน', 'warn'); $('#inpConc').focus(); return; }
+    if (!blank) { toast('ต้องตั้ง BLANK ก่อน', 'warn'); return; }
+    runCapture(e.currentTarget, async () => {
+      const r = rejectSaturated(await captureNorm(10));
+      std.pts.push({ conc, norm: r.norm });
+      std.pts.sort((p, q) => p.conc - q.conc);
+      saveStd();
+      $('#inpConc').value = '';
+      toast(`เพิ่มสารมาตรฐาน ${conc} ${std.unit} · A = ${f(absOf(r.norm, std.ch), 4)}`, 'ok');
+    });
+  };
+  $('#stdBody').onclick = e => { const b = e.target.closest('button[data-i]'); if (b) { std.pts.splice(+b.dataset.i, 1); saveStd(); } };
+  $('#btnStdClr').onclick = () => { if (std.pts.length && confirm('ลบสารมาตรฐานทั้งหมด?')) { std.pts = []; saveStd(); } };
+
+  // log
+  $('#btnRec').onclick = () => setRec(!recording);
+  $('#btnCap').onclick = captureRow;
+  $('#btnCsv').onclick = exportCsv;
+  $('#btnLogClr').onclick = () => {
+    if (logRows.length && !confirm(`ลบข้อมูล ${logRows.length} แถว?`)) return;
+    logRows.length = 0; logSeq = 0; $('#logBody').innerHTML = ''; $('#logCount').textContent = '0';
+  };
+
+  // console
+  $('#chkConData').onchange = e => { prefs.conData = e.target.checked; savePrefs(); };
+  $('#btnConClr').onclick = () => { $('#con').innerHTML = ''; };
+  $('#conForm').onsubmit = e => { e.preventDefault(); const v = $('#conCmd').value.trim(); if (v) { send(v); $('#conCmd').value = ''; } };
+
+  // keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+    if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+    const k = e.key.toLowerCase();
+    if (k === ' ') { if (e.target.closest('button')) return; e.preventDefault(); captureRow(); }
+    else if (k === 'l') { if (link) send(`LED ${dev.state.led ? 0 : 1}`); }
+    else if (k === 'm') { if (link) send('READ'); }
+    else if (k === 'h') setHold(!hold);
+    else if (k === 'r') setRef();
+  });
+
+  // sample-rate meter & stale-data watchdog
+  setInterval(() => {
+    const now = performance.now(), last = rxTimes[rxTimes.length - 1];
+    const live = rxTimes.length > 1 && now - last < 3000;
+    $('#vHz').textContent = live ? f((rxTimes.length - 1) / ((last - rxTimes[0]) / 1000), 2) : '—';
+    if (link && dev.state.stream && (!last || now - last > 3000)) $('#sbStream').textContent = 'NO DATA';
+    else updateStatus();
+  }, 500);
+
+  const ro = new ResizeObserver(() => requestRender());
+  $$('.canvas-wrap').forEach(el => ro.observe(el));
+  applyState({});          // show firmware defaults until a device reports its own state
+  setLinkUi('offline');
+  updateCalUi();
+  updateRefUi();
+  requestRender();
+
+  // index.html?demo starts the simulator; &tab=cie|abs|log|console|guide opens a tab
+  const qp = new URLSearchParams(location.search);
+  if (qp.get('tab')) $(`.tab[data-tab="${CSS.escape(qp.get('tab'))}"]`)?.click();
+  if (qp.has('demo')) connectWith(DemoTransport);
+}
+
+init();
+})();
+</script>
+</body>
+</html>
