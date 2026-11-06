@@ -325,12 +325,21 @@ footer{padding:4px 16px 20px;text-align:center;font:11px/1.6 var(--mono);color:v
     <div class="ph"><span class="ph-idx">03</span>Controls</div>
     <div class="ctrl-grid">
       <div class="cgroup">
-        <div class="cg-title">Illumination LED</div>
+        <div class="cg-title">Sensor LED</div>
         <div class="led-row">
           <button class="switch lg" id="swLed" role="switch" aria-checked="false" aria-label="Sensor LED" data-dev><span class="knob"></span></button>
           <div><div class="led-state" id="vLedTxt">LED OFF</div><div class="hint" style="margin:0">ไฟส่องบนบอร์ดเซนเซอร์ · คีย์ <kbd>L</kbd></div></div>
         </div>
         <label class="slider"><span>Brightness</span><input type="range" id="rngPwr" min="0" max="100" step="5" value="100" data-dev><output id="vPwr">—</output></label>
+      </div>
+
+      <div class="cgroup">
+        <div class="cg-title">External LED</div>
+        <div class="led-row">
+          <button class="switch lg" id="swXled" role="switch" aria-checked="false" aria-label="External LED" data-dev><span class="knob"></span></button>
+          <div><div class="led-state" id="vXledTxt">LED OFF</div><div class="hint" style="margin:0">LED ที่ต่อเพิ่ม · <span id="vXledPin">GPIO 0</span> · คีย์ <kbd>X</kbd></div></div>
+        </div>
+        <label class="slider"><span>Power</span><input type="range" id="rngXpwr" min="0" max="100" step="5" value="100" data-dev><output id="vXpwr">—</output></label>
       </div>
 
       <div class="cgroup">
@@ -353,7 +362,7 @@ footer{padding:4px 16px 20px;text-align:center;font:11px/1.6 var(--mono);color:v
         <div class="cal-row"><button class="btn" id="btnDark" data-dev>Dark</button><span class="cal-st" id="vDark">not set</span></div>
         <div class="cal-row"><button class="btn" id="btnWhite" data-dev>White</button><span class="cal-st" id="vWhite">not set</span></div>
         <button class="btn ghost sm" id="btnCalClr">Reset calibration</button>
-        <p class="hint"><b>DARK</b> — ระบบปิด LED ชั่วคราวเพื่อวัดแสงรบกวนแล้วหักออก<br><b>WHITE</b> — วางกระดาษขาว/แผ่นอ้างอิงสีขาว ที่ระยะเดียวกับการวัดจริง แล้วกด</p>
+        <p class="hint"><b>DARK</b> — ระบบปิด LED ทั้งสองดวงชั่วคราวเพื่อวัดแสงรบกวนแล้วหักออก<br><b>WHITE</b> — วางกระดาษขาว/แผ่นอ้างอิงสีขาว ที่ระยะเดียวกับการวัดจริง แล้วกด</p>
       </div>
 
       <div class="cgroup">
@@ -474,7 +483,7 @@ footer{padding:4px 16px 20px;text-align:center;font:11px/1.6 var(--mono);color:v
       </div>
       <pre class="console" id="con"></pre>
       <form class="con-input" id="conForm" autocomplete="off">
-        <span>&gt;</span><input class="inp" id="conCmd" placeholder="เช่น LED 1 · GAIN 16 · IT 154 · AGC 1 · INFO" data-dev>
+        <span>&gt;</span><input class="inp" id="conCmd" placeholder="เช่น LED 1 · XLED 1 · XPWR 50 · GAIN 16 · INFO" data-dev>
         <button class="btn sm" data-dev>Send</button>
       </form>
     </div>
@@ -496,6 +505,7 @@ footer{padding:4px 16px 20px;text-align:center;font:11px/1.6 var(--mono);color:v
               <tr><td>SCL</td><td>GPIO 4</td></tr>
               <tr><td>LED</td><td>GPIO 1</td></tr>
               <tr><td>3V3, INT</td><td>ไม่ต้องต่อ</td></tr>
+              <tr><td>LED ภายนอก</td><td>GPIO 0 → ตัวต้านทาน → ขายาว (+) · ขาสั้น (−) → GND</td></tr>
             </tbody>
           </table>
           <p class="hint">ห้ามต่ออุปกรณ์ที่ GPIO 2, 8, 9 (ขาบูต) · ไฟสีฟ้าบนบอร์ด (GPIO 8) กะพริบทุกครั้งที่ส่งข้อมูล · ปุ่ม BOOT (GPIO 9) = เปิด/ปิด LED ของเซนเซอร์ · ชื่อขาพิมพ์อยู่ด้านหลังบอร์ด</p>
@@ -514,7 +524,8 @@ footer{padding:4px 16px 20px;text-align:center;font:11px/1.6 var(--mono);color:v
         <div>
           <h3>Keyboard</h3>
           <table class="data"><tbody>
-            <tr><td><kbd>L</kbd></td><td>เปิด/ปิด LED</td></tr>
+            <tr><td><kbd>L</kbd></td><td>เปิด/ปิด LED ของเซนเซอร์</td></tr>
+            <tr><td><kbd>X</kbd></td><td>เปิด/ปิด LED ภายนอก</td></tr>
             <tr><td><kbd>M</kbd></td><td>วัดหนึ่งครั้ง</td></tr>
             <tr><td><kbd>H</kbd></td><td>Hold ค้างค่า</td></tr>
             <tr><td><kbd>R</kbd></td><td>ตั้งสีปัจจุบันเป็นสีอ้างอิง</td></tr>
@@ -526,6 +537,8 @@ footer{padding:4px 16px 20px;text-align:center;font:11px/1.6 var(--mono);color:v
           <table class="data"><tbody>
             <tr><td><code>LED 0|1|T</code></td><td>ปิด / เปิด / สลับ</td></tr>
             <tr><td><code>PWR 0–100</code></td><td>ความสว่าง LED (%)</td></tr>
+            <tr><td><code>XLED 0|1|T</code></td><td>LED ภายนอก ปิด / เปิด / สลับ</td></tr>
+            <tr><td><code>XPWR 0–100</code></td><td>กำลังไฟ LED ภายนอก (%)</td></tr>
             <tr><td><code>GAIN 1|4|16|60</code></td><td>อัตราขยาย</td></tr>
             <tr><td><code>IT ms</code> · <code>ATIME n</code></td><td>เวลาอินทิเกรต 2.4–614 ms</td></tr>
             <tr><td><code>AGC 0|1</code></td><td>Auto-range</td></tr>
@@ -806,7 +819,7 @@ class BleTransport {
 class DemoTransport {
   constructor(h) {
     this.h = h; this.kind = 'demo'; this.label = 'DEMO'; this.name = 'RGBMeter-DEMO';
-    this.s = { led: 1, pwr: 100, gain: 1, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0 };
+    this.s = { led: 1, pwr: 100, gain: 1, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0, xled: 0, xpwr: 100 };
     this.agcIdx = 3; this.t0 = performance.now(); this.lastEmit = 0; this.acc = null; this.closed = false; this.oneShot = false;
   }
   async connect() { this.cycle(); }
@@ -815,7 +828,7 @@ class DemoTransport {
   out(line) { setTimeout(() => { if (!this.closed) this.h.onLine(line); }, 2); }
   stateLine() {
     const s = this.s;
-    return `S,led=${s.led},pwr=${s.pwr},gain=${GAINS[s.gain]},atime=${s.atime},agc=${s.agc},rate=${s.rate},stream=${s.stream},pix=${s.pix}`;
+    return `S,led=${s.led},pwr=${s.pwr},gain=${GAINS[s.gain]},atime=${s.atime},agc=${s.agc},rate=${s.rate},stream=${s.stream},pix=${s.pix},xled=${s.xled},xpwr=${s.xpwr}`;
   }
   agcSelect(i) { this.agcIdx = i; this.s.gain = AGC_LADDER[i][0]; this.s.atime = AGC_LADDER[i][1]; this.acc = null; }
   async send(line) {
@@ -824,6 +837,8 @@ class DemoTransport {
     switch (cmd) {
       case 'LED': s.led = argU === 'T' ? 1 - s.led : (n ? 1 : 0); this.acc = null; break;
       case 'PWR': s.pwr = clamp(Math.round(n) || 0, 0, 100); this.acc = null; break;
+      case 'XLED': s.xled = argU === 'T' ? 1 - s.xled : (n ? 1 : 0); this.acc = null; break;
+      case 'XPWR': s.xpwr = clamp(Math.round(n) || 0, 0, 100); this.acc = null; break;
       case 'GAIN': s.gain = n >= 60 ? 3 : n >= 16 ? 2 : n >= 4 ? 1 : 0; s.agc = 0; this.acc = null; break;
       case 'IT': s.atime = 256 - clamp(Math.round(n / 2.4) || 1, 1, 256); s.agc = 0; this.acc = null; break;
       case 'ATIME': s.atime = clamp(Math.round(n) || 0, 0, 255); s.agc = 0; this.acc = null; break;
@@ -833,7 +848,7 @@ class DemoTransport {
       case 'READ': this.oneShot = true; this.acc = null; return;
       case 'PIX': { const was = s.pix; s.pix = argU === 'AUTO' || argU === '1' ? 1 : /\d+[\s,]+\d+[\s,]+\d+/.test(arg) ? 2 : 0; if (was === 2 && s.pix === 2) return; break; }
       case 'SAVE': this.out('#settings saved (demo)'); return;
-      case 'DEFAULTS': Object.assign(s, { led: 1, pwr: 100, gain: 1, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0 }); break;
+      case 'DEFAULTS': Object.assign(s, { led: 1, pwr: 100, gain: 1, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0, xled: 0, xpwr: 100 }); break;
       case 'INFO': case '?': this.out(`I,RGBMeter,1.1.0-demo,0x44,${this.name},C3`); break;
       case 'STATE': break;
       default: this.out(`E,UNKNOWN_CMD,${cmd}`); return;
@@ -845,7 +860,7 @@ class DemoTransport {
     const P = [[.78, .12, .10], [.92, .70, .08], [.12, .50, .22], [.08, .26, .72], [.50, .16, .56], [.86, .86, .83], [.18, .18, .18]];
     const k = t / 7, i = Math.floor(k) % P.length, j = (i + 1) % P.length;
     let u = k - Math.floor(k); u = u < 0.7 ? 0 : (u - 0.7) / 0.3; u = u * u * (3 - 2 * u);
-    const light = (s.led ? s.pwr / 100 : 0) + 0.04 + 0.01 * Math.sin(t * 0.7);
+    const light = (s.led ? s.pwr / 100 : 0) + (s.xled ? s.xpwr / 100 * 0.5 : 0) + 0.04 + 0.01 * Math.sin(t * 0.7);
     const [lr, lg, lb] = [0, 1, 2].map(q => (P[i][q] + (P[j][q] - P[i][q]) * u) * light);
     const ir = 0.10 * light;
     const resp = { r: 1.00 * lr + 0.06 * lg + 0.02 * lb + ir, g: 0.10 * lr + 0.92 * lg + 0.12 * lb + 0.6 * ir, b: 0.03 * lr + 0.14 * lg + 0.80 * lb + 0.5 * ir };
@@ -887,7 +902,7 @@ class DemoTransport {
 
 /* ================================ state ================================ */
 let link = null;
-const dev = { info: {}, state: { led: 0, pwr: 100, gain: 4, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0 } };
+const dev = { info: {}, state: { led: 0, pwr: 100, gain: 4, atime: 0xC0, agc: 0, rate: 100, stream: 1, pix: 0, xled: 0, xpwr: 100 } };
 const cal = Object.assign({ dark: null, white: null }, store.get('cm.cal', {}));
 let blank = store.get('cm.blank', null);
 let ref = store.get('cm.ref', null);
@@ -976,6 +991,7 @@ function handleLine(line) {
     case 'I':
       dev.info = { model: p[1], fw: p[2], id: p[3], name: p[4], board: p[5] || 'S3' };  // fw 1.0.0 was S3-only
       $('#fieldPix').hidden = dev.info.board !== 'S3';   // only the S3 Super Mini has an RGB LED
+      $('#vXledPin').textContent = dev.info.board === 'S3' ? 'GPIO 6' : 'GPIO 0';
       updateStatus();
       break;
     case 'E': {
@@ -997,6 +1013,11 @@ function applyState(o) {
   $('#vLedTxt').classList.toggle('on', !!s.led);
   $('#rngPwr').value = s.pwr;
   $('#vPwr').textContent = `${s.pwr}%`;
+  setSwitch($('#swXled'), !!s.xled);
+  $('#vXledTxt').textContent = s.xled ? `LED ON · ${s.xpwr}%` : 'LED OFF';
+  $('#vXledTxt').classList.toggle('on', !!s.xled);
+  $('#rngXpwr').value = s.xpwr;
+  $('#vXpwr').textContent = `${s.xpwr}%`;
   $$('#segGain button').forEach(b => b.classList.toggle('on', +b.dataset.v === s.gain));
   const cyc = 256 - s.atime;
   ensureOption($('#selIt'), cyc, `${(cyc * 2.4).toFixed(1)} ms`);
@@ -1133,11 +1154,16 @@ function feedCaptures(s) {
   }
   if (pending.length && !dev.state.stream) send('READ', true);
 }
-async function withLed(on, fn) {
-  const prev = !!dev.state.led;
-  if (prev !== on) { const w = waitState(s => !!s.led === on); await send(`LED ${on ? 1 : 0}`); await w; }
+// Switch both light sources off for the duration of fn, then restore them
+async function withLightsOff(fn) {
+  const on = ['LED', 'XLED'].filter(cmd => dev.state[cmd.toLowerCase()]);
+  if (on.length) {
+    const w = waitState(s => !s.led && !s.xled);
+    for (const cmd of on) await send(`${cmd} 0`);
+    await w;
+  }
   try { return await fn(); }
-  finally { if (prev !== on && link) send(`LED ${prev ? 1 : 0}`); }
+  finally { if (link) for (const cmd of on) send(`${cmd} 1`); }
 }
 async function runCapture(btn, fn) {
   if (btn.classList.contains('busy')) return;
@@ -1684,6 +1710,9 @@ function init() {
   $('#swLed').onclick = () => send(`LED ${dev.state.led ? 0 : 1}`);
   $('#rngPwr').oninput = e => { $('#vPwr').textContent = `${e.target.value}%`; };
   $('#rngPwr').onchange = e => send(`PWR ${e.target.value}`);
+  $('#swXled').onclick = () => send(`XLED ${dev.state.xled ? 0 : 1}`);
+  $('#rngXpwr').oninput = e => { $('#vXpwr').textContent = `${e.target.value}%`; };
+  $('#rngXpwr').onchange = e => send(`XPWR ${e.target.value}`);
   $('#segGain').onclick = e => { const b = e.target.closest('button'); if (b) send(`GAIN ${b.dataset.v}`); };
   $('#selIt').onchange = e => send(`ATIME ${256 - +e.target.value}`);
   $('#swAgc').onclick = () => send(`AGC ${dev.state.agc ? 0 : 1}`);
@@ -1703,7 +1732,7 @@ function init() {
 
   // calibration
   $('#btnDark').onclick = e => runCapture(e.currentTarget, async () => {
-    const r = await withLed(false, () => captureNorm(10));
+    const r = await withLightsOff(() => captureNorm(10));
     cal.dark = { ...r.norm, ts: Date.now() };
     saveCal();
     toast('บันทึก DARK แล้ว', 'ok');
@@ -1790,6 +1819,7 @@ function init() {
     const k = e.key.toLowerCase();
     if (k === ' ') { if (e.target.closest('button')) return; e.preventDefault(); captureRow(); }
     else if (k === 'l') { if (link) send(`LED ${dev.state.led ? 0 : 1}`); }
+    else if (k === 'x') { if (link) send(`XLED ${dev.state.xled ? 0 : 1}`); }
     else if (k === 'm') { if (link) send('READ'); }
     else if (k === 'h') setHold(!hold);
     else if (k === 'r') setRef();
